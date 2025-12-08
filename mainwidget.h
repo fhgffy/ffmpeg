@@ -1,7 +1,7 @@
 ﻿#ifndef MAINWIDGET_H
 #define MAINWIDGET_H
 #include "FFmpegKits.h"
-
+#include "CFrameLessWidgetBase.h"
 #include <QWidget>
 #include <QImage>
 
@@ -21,7 +21,7 @@ enum PLAYER_STATE
     PLAYER_STOP
 };
 
-class MainWidget : public QWidget
+class MainWidget : public CFrameLessWidgetBase
 {
     Q_OBJECT
 

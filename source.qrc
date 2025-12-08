@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>source/condition/min.png</file>
+        <file>source/condition/plus.png</file>
+        <file>source/control/control.png</file>
+        <file>source/logo/logo.png</file>
+    </qresource>
+</RCC>

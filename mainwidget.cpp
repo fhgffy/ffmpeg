@@ -5,7 +5,7 @@
 #include <QDebug>
 
 MainWidget::MainWidget(QWidget *parent)
-    : QWidget(parent)
+    : CFrameLessWidgetBase(parent)
     , ui(new Ui::MainWidget)
     , _ffmpegKits(new FFmpegKits)
     , _kPlayState(PLAYER_IDLE)
@@ -87,5 +87,4 @@ void MainWidget::on_flipButton_clicked()
 {
     _hFlip = !_hFlip;
 }
-
 

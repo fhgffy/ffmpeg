@@ -16,11 +16,19 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    cframelesswidgetbase.cpp \
+    copenfilebutton.cpp \
+    ctimeslider.cpp \
+    cvideowidgettopwidget.cpp \
     ffmpegkits.cpp \
     main.cpp \
     mainwidget.cpp
 
 HEADERS += \
+    cframelesswidgetbase.h \
+    copenfilebutton.h \
+    ctimeslider.h \
+    cvideowidgettopwidget.h \
     ffmpegkits.h \
     mainwidget.h
 
@@ -71,3 +79,6 @@ win32: LIBS += -L$$PWD/../../libffmpeg_4.4.r101753_msvc16_x86/lib/x86/ -lswscale
 
 INCLUDEPATH += $$PWD/../../libffmpeg_4.4.r101753_msvc16_x86/include
 DEPENDPATH += $$PWD/../../libffmpeg_4.4.r101753_msvc16_x86/include
+
+RESOURCES += \
+    sources.qrc

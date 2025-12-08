@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>condition/min.png</file>
+        <file>condition/plus.png</file>
+        <file>control/control.png</file>
+        <file>logo/logo.png</file>
+        <file>ToolBar/log.png</file>
+        <file>ToolBar/map.png</file>
+        <file>ToolBar/system.png</file>
+        <file>ToolBar/video_monitor.png</file>
+        <file>ToolBar/video_playback.png</file>
+    </qresource>
+</RCC>
