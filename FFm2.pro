@@ -19,6 +19,7 @@ SOURCES += \
     cframelesswidgetbase.cpp \
     copenfilebutton.cpp \
     ctimeslider.cpp \
+    ctopmenubar.cpp \
     cvideowidgettopwidget.cpp \
     ffmpegkits.cpp \
     main.cpp \
@@ -28,6 +29,7 @@ HEADERS += \
     cframelesswidgetbase.h \
     copenfilebutton.h \
     ctimeslider.h \
+    ctopmenubar.h \
     cvideowidgettopwidget.h \
     ffmpegkits.h \
     mainwidget.h

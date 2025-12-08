@@ -4,6 +4,7 @@
 #include "CFrameLessWidgetBase.h"
 #include <QWidget>
 #include <QImage>
+#include "ctopmenubar.h"
 
 #include <memory>
 
@@ -48,5 +49,6 @@ private:
     PLAYER_STATE _kPlayState;
     bool _hFlip;//水平翻转
     bool _vFlip;//垂直翻转
+    CTopMenuBar* m_pTopMenuBar = nullptr;//菜单栏
 };
 #endif // MAINWIDGET_H

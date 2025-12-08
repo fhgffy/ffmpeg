@@ -15,6 +15,10 @@ MainWidget::MainWidget(QWidget *parent)
     ui->setupUi(this);
 
     connect(_ffmpegKits.get(), &FFmpegKits::sigGetOneFrame, this, &MainWidget::getOneFrame);
+    //菜单栏对象
+    m_pTopMenuBar = new CTopMenuBar(this);
+    connect(m_pTopMenuBar, &CTopMenuBar::sig_VideoMonitor,
+            this, &MainWidget::on_playButton_clicked);
 }
 
 MainWidget::~MainWidget()
