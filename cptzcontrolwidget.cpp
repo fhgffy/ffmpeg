@@ -1,4 +1,5 @@
 ﻿#include "cptzcontrolwidget.h"
+#include "cryptstring.h"
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QPushButton>
@@ -22,14 +23,15 @@ void CPTZControlWidget::sendPtzRequest(const QString &command)
     // Construct the API URL
     QUrl url("http://192.168.6.100/xsw/api/ptz/control");
 
-    // Build query parameters
-    QUrlQuery query;
-    query.addQueryItem("value", command);
-    query.addQueryItem("stop", "1");
-    query.addQueryItem("steps", QString::number(m_step));
-
-    // Set the query on the URL
-    url.setQuery(query);
+    // Build query parameters using KVQuery for authentication
+    KVQuery kvQuery;
+    kvQuery.add("value", command.toStdString());
+    kvQuery.add("stop", "1");
+    kvQuery.add("steps", std::to_string(m_step));
+    
+    // Get the authenticated query string with token
+    std::string queryString = kvQuery.toCrpytString();
+    url.setQuery(QString::fromStdString(queryString));
 
     // Create the request
     QNetworkRequest request(url);
