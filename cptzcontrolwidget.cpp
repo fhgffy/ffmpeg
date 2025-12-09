@@ -41,13 +41,16 @@ void CPTZControlWidget::sendPtzRequest(const QString &command)
     qDebug() << "PTZ Request:" << url.toString();
     
     // Connect to handle the reply (optional - for error handling)
-    connect(reply, &QNetworkReply::finished, this, [reply]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            qDebug() << "PTZ Request successful:" << reply->readAll();
-        } else {
-            qDebug() << "PTZ Request error:" << reply->errorString();
+    connect(reply, &QNetworkReply::finished, this, [this]() {
+        QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+        if (reply) {
+            if (reply->error() == QNetworkReply::NoError) {
+                qDebug() << "PTZ Request successful:" << reply->readAll();
+            } else {
+                qDebug() << "PTZ Request error:" << reply->errorString();
+            }
+            reply->deleteLater();
         }
-        reply->deleteLater();
     });
 }
 
