@@ -26,7 +26,7 @@ QT_END_NAMESPACE
 // 前向声明
 class CWindowInfoWidget;
 class CDeviceListWidget; // 新增
-
+class CPTZControlWidget;
 class MainWidget : public CFrameLessWidgetBase
 {
     Q_OBJECT
@@ -58,7 +58,7 @@ private:
     CWindowInfoWidget* m_pWindowInfoWidget = nullptr; // 左侧
     QWidget* m_pVideoArea = nullptr;                  // 中间视频区
     CDeviceListWidget* m_pDeviceListWidget = nullptr; // 右侧设备列表
-
+    CPTZControlWidget* m_pPTZControlWidget = nullptr; // 新增：右侧云台控制
     QImage _image;
 
     // 辅助

@@ -19,6 +19,7 @@ SOURCES += \
     cdevicelistwidget.cpp \
     cframelesswidgetbase.cpp \
     copenfilebutton.cpp \
+    cptzcontrolwidget.cpp \
     ctimeslider.cpp \
     ctopmenubar.cpp \
     cvideowidgettopwidget.cpp \
@@ -31,6 +32,7 @@ HEADERS += \
     cdevicelistwidget.h \
     cframelesswidgetbase.h \
     copenfilebutton.h \
+    cptzcontrolwidget.h \
     ctimeslider.h \
     ctopmenubar.h \
     cvideowidgettopwidget.h \
@@ -88,3 +90,5 @@ DEPENDPATH += $$PWD/../../libffmpeg_4.4.r101753_msvc16_x86/include
 
 RESOURCES += \
     sources.qrc
+
+DISTFILES +=

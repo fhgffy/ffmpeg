@@ -9,5 +9,6 @@
         <file>ToolBar/system.png</file>
         <file>ToolBar/video_monitor.png</file>
         <file>ToolBar/video_playback.png</file>
+        <file>control/inverse.png</file>
     </qresource>
 </RCC>

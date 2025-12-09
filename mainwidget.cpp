@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include "cptzcontrolwidget.h" // 新增头文件
 
 MainWidget::MainWidget(QWidget *parent)
     : CFrameLessWidgetBase(parent)
@@ -62,29 +63,28 @@ void MainWidget::initLayout()
     // 设置伸缩因子为 1，让视频区占据主要空间
     globalLayout->addWidget(m_pVideoArea, 1);
 
-    // --- 右侧：设备列表与云台 ---
-    QWidget *rightPanel = new QWidget(this);
-    rightPanel->setFixedWidth(240);
-    rightPanel->setStyleSheet("background-color: #2d2d2d;");
+    // --- 右侧布局 ---
+       QWidget *rightPanel = new QWidget(this);
+       rightPanel->setFixedWidth(240);
+       rightPanel->setStyleSheet("background-color: #2d2d2d;");
 
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
-    rightLayout->setContentsMargins(0, 0, 0, 0);
-    rightLayout->setSpacing(0);
+       QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
+       rightLayout->setContentsMargins(0, 0, 0, 0);
+       rightLayout->setSpacing(0);
 
-    // 右侧上半部分：设备列表
-    m_pDeviceListWidget = new CDeviceListWidget(rightPanel);
-    rightLayout->addWidget(m_pDeviceListWidget);
+       // 上半部分：设备列表
+       m_pDeviceListWidget = new CDeviceListWidget(rightPanel);
+       rightLayout->addWidget(m_pDeviceListWidget);
 
-    // 右侧下半部分：云台控制 (暂时留白/占位，以后实现)
-    QWidget *ptzPlaceholder = new QWidget(rightPanel);
-    // ptzPlaceholder->setStyleSheet("background-color: #333;"); // 测试看区域
-    rightLayout->addWidget(ptzPlaceholder);
+       // 下半部分：云台控制 (2. 实例化并添加)
+       m_pPTZControlWidget = new CPTZControlWidget(rightPanel);
+       rightLayout->addWidget(m_pPTZControlWidget);
 
-    // 设置上下比例，设备列表占多一点，或者各一半
-    rightLayout->setStretchFactor(m_pDeviceListWidget, 6);
-    rightLayout->setStretchFactor(ptzPlaceholder, 4);
+       // 设置伸缩因子，设备列表占 60%，云台占 40%
+       rightLayout->setStretchFactor(m_pDeviceListWidget, 6);
+       rightLayout->setStretchFactor(m_pPTZControlWidget, 4);
 
-    globalLayout->addWidget(rightPanel);
+       globalLayout->addWidget(rightPanel);
 
     // 注意：不再添加 ui->widget 到布局中，从而达到"去掉"的效果
     if(ui->widget) {
