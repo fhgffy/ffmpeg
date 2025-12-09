@@ -1,19 +1,14 @@
 ﻿#ifndef MAINWIDGET_H
 #define MAINWIDGET_H
+
 #include "FFmpegKits.h"
 #include "CFrameLessWidgetBase.h"
 #include <QWidget>
 #include <QImage>
 #include "ctopmenubar.h"
-
 #include <memory>
 
-using std::unique_ptr;
-
-QT_BEGIN_NAMESPACE
-namespace Ui { class MainWidget; }
-QT_END_NAMESPACE
-
+// 1. 将枚举定义移到类外面，解决编译错误
 enum PLAYER_STATE
 {
     PLAYER_IDLE = 0,
@@ -21,6 +16,16 @@ enum PLAYER_STATE
     PLAYER_PAUSE,
     PLAYER_STOP
 };
+
+using std::unique_ptr;
+
+QT_BEGIN_NAMESPACE
+namespace Ui { class MainWidget; }
+QT_END_NAMESPACE
+
+// 前向声明
+class CWindowInfoWidget;
+class CDeviceListWidget; // 新增
 
 class MainWidget : public CFrameLessWidgetBase
 {
@@ -30,25 +35,34 @@ public:
     MainWidget(QWidget *parent = nullptr);
     ~MainWidget();
 
-    void paintEvent(QPaintEvent *event) override;
+    // 移除 paintEvent，我们用 eventFilter 在子控件上画图
+    // void paintEvent(QPaintEvent *event) override;
 
 private slots:
     void getOneFrame(QImage image);
-
-    void on_pauseButton_clicked();
-
-    void on_playButton_clicked();
-
-    void on_flipButton_clicked();
-
+    // 移除 UI 按钮的槽函数，因为按钮被删了，但保留逻辑函数
+    void startPlayLogic(); // 改名：启动播放逻辑
+    void flipLogic();      // 改名：翻转逻辑
 
 private:
     Ui::MainWidget *ui;
     unique_ptr<FFmpegKits> _ffmpegKits;
-    QImage _image;
+
+    // 状态
     PLAYER_STATE _kPlayState;
-    bool _hFlip;//水平翻转
-    bool _vFlip;//垂直翻转
-    CTopMenuBar* m_pTopMenuBar = nullptr;//菜单栏
+    bool _hFlip;
+    bool _vFlip;
+
+    // UI 组件指针
+    CTopMenuBar* m_pTopMenuBar = nullptr;
+    CWindowInfoWidget* m_pWindowInfoWidget = nullptr; // 左侧
+    QWidget* m_pVideoArea = nullptr;                  // 中间视频区
+    CDeviceListWidget* m_pDeviceListWidget = nullptr; // 右侧设备列表
+
+    QImage _image;
+
+    // 辅助
+    void initLayout();
+    bool eventFilter(QObject *watched, QEvent *event) override;
 };
 #endif // MAINWIDGET_H

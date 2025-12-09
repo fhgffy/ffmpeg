@@ -16,21 +16,25 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    cdevicelistwidget.cpp \
     cframelesswidgetbase.cpp \
     copenfilebutton.cpp \
     ctimeslider.cpp \
     ctopmenubar.cpp \
     cvideowidgettopwidget.cpp \
+    cwindowinfowidget.cpp \
     ffmpegkits.cpp \
     main.cpp \
     mainwidget.cpp
 
 HEADERS += \
+    cdevicelistwidget.h \
     cframelesswidgetbase.h \
     copenfilebutton.h \
     ctimeslider.h \
     ctopmenubar.h \
     cvideowidgettopwidget.h \
+    cwindowinfowidget.h \
     ffmpegkits.h \
     mainwidget.h
 
