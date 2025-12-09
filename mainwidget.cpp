@@ -91,6 +91,11 @@ void MainWidget::initLayout()
         ui->widget->hide(); // 确保隐藏
         ui->widget->setParent(nullptr); // 从对象树移除或者单纯隐藏
     }
+    // 在构造函数或 initLayout() 中添加连接
+    connect(m_pPTZControlWidget, &CPTZControlWidget::sig_CenterClicked, this, [this]() {
+        m_pWindowInfoWidget->addMessage("执行反转操作...");
+        flipLogic();
+    });
 }
 
 void MainWidget::getOneFrame(QImage image)

@@ -9,6 +9,8 @@ class CPTZControlWidget : public QWidget
 public:
     explicit CPTZControlWidget(QWidget *parent = nullptr);
 
+signals:
+    void sig_CenterClicked();  // 中心按钮点击信号
 private slots:
     // 9个方向功能槽函数
     void onBtnUpClicked();
