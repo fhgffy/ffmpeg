@@ -5,14 +5,59 @@
 #include <QLabel>
 #include <QSlider>
 #include <QDebug>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QUrl>
+#include <QUrlQuery>
 
 void CPTZControlWidget::onBtnCenterClicked() {
     qDebug() << "Center/Stop Clicked -> Emitting Signal"; // 添加日志方便调试
+    sendPtzRequest("s");  // Send PTZ request for center/stop
     emit sig_CenterClicked();  // 发出信号
+}
+
+void CPTZControlWidget::sendPtzRequest(const QString &command)
+{
+    // Construct the API URL
+    QUrl url("http://192.168.6.100/xsw/api/ptz/control");
+    
+    // Build query parameters
+    QUrlQuery query;
+    query.addQueryItem("value", command);
+    query.addQueryItem("stop", "1");
+    query.addQueryItem("steps", QString::number(m_step));
+    
+    // Set the query on the URL
+    url.setQuery(query);
+    
+    // Create the request
+    QNetworkRequest request(url);
+    
+    // Send POST request
+    QNetworkReply *reply = m_networkManager->post(request, QByteArray());
+    
+    // Log the request for debugging
+    qDebug() << "PTZ Request:" << url.toString();
+    
+    // Connect to handle the reply (optional - for error handling)
+    connect(reply, &QNetworkReply::finished, this, [this]() {
+        QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+        if (reply) {
+            if (reply->error() == QNetworkReply::NoError) {
+                qDebug() << "PTZ Request successful:" << reply->readAll();
+            } else {
+                qDebug() << "PTZ Request error:" << reply->errorString();
+            }
+            reply->deleteLater();
+        }
+    });
 }
 
 CPTZControlWidget::CPTZControlWidget(QWidget *parent) : QWidget(parent)
 {
+    m_networkManager = new QNetworkAccessManager(this);
+    m_step = 5;  // Default step value
     setupUi();
 }
 
@@ -185,18 +230,57 @@ void CPTZControlWidget::setupUi()
 }
 
 // 槽函数实现
-void CPTZControlWidget::onBtnUpClicked() { qDebug() << "Up"; }
-void CPTZControlWidget::onBtnDownClicked() { qDebug() << "Down"; }
-void CPTZControlWidget::onBtnLeftClicked() { qDebug() << "Left"; }
-void CPTZControlWidget::onBtnRightClicked() { qDebug() << "Right"; }
-void CPTZControlWidget::onBtnUpLeftClicked() { qDebug() << "UpLeft"; }
-void CPTZControlWidget::onBtnUpRightClicked() { qDebug() << "UpRight"; }
-void CPTZControlWidget::onBtnDownLeftClicked() { qDebug() << "DownLeft"; }
-void CPTZControlWidget::onBtnDownRightClicked() { qDebug() << "DownRight"; }
-void CPTZControlWidget::onBtnZoomInClicked() { qDebug() << "Zoom In"; }
-void CPTZControlWidget::onBtnZoomOutClicked() { qDebug() << "Zoom Out"; }
-void CPTZControlWidget::onBtnFocusNearClicked() { qDebug() << "Focus Near"; }
-void CPTZControlWidget::onBtnFocusFarClicked() { qDebug() << "Focus Far"; }
+void CPTZControlWidget::onBtnUpClicked() { 
+    qDebug() << "Up"; 
+    sendPtzRequest("u");
+}
+void CPTZControlWidget::onBtnDownClicked() { 
+    qDebug() << "Down"; 
+    sendPtzRequest("d");
+}
+void CPTZControlWidget::onBtnLeftClicked() { 
+    qDebug() << "Left"; 
+    sendPtzRequest("l");
+}
+void CPTZControlWidget::onBtnRightClicked() { 
+    qDebug() << "Right"; 
+    sendPtzRequest("r");
+}
+void CPTZControlWidget::onBtnUpLeftClicked() { 
+    qDebug() << "UpLeft"; 
+    sendPtzRequest("1");
+}
+void CPTZControlWidget::onBtnUpRightClicked() { 
+    qDebug() << "UpRight"; 
+    sendPtzRequest("2");
+}
+void CPTZControlWidget::onBtnDownLeftClicked() { 
+    qDebug() << "DownLeft"; 
+    sendPtzRequest("3");
+}
+void CPTZControlWidget::onBtnDownRightClicked() { 
+    qDebug() << "DownRight"; 
+    sendPtzRequest("4");
+}
+void CPTZControlWidget::onBtnZoomInClicked() { 
+    qDebug() << "Zoom In"; 
+    sendPtzRequest("f");
+}
+void CPTZControlWidget::onBtnZoomOutClicked() { 
+    qDebug() << "Zoom Out"; 
+    sendPtzRequest("n");
+}
+void CPTZControlWidget::onBtnFocusNearClicked() { 
+    qDebug() << "Focus Near"; 
+    sendPtzRequest("i");
+}
+void CPTZControlWidget::onBtnFocusFarClicked() { 
+    qDebug() << "Focus Far"; 
+    sendPtzRequest("o");
+}
 void CPTZControlWidget::onBtnApertureOpenClicked() { qDebug() << "Aperture Open"; }
 void CPTZControlWidget::onBtnApertureCloseClicked() { qDebug() << "Aperture Close"; }
-void CPTZControlWidget::onStepChanged(int value) { qDebug() << "Step:" << value; }
+void CPTZControlWidget::onStepChanged(int value) { 
+    qDebug() << "Step:" << value; 
+    m_step = value;
+}

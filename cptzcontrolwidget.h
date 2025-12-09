@@ -3,6 +3,8 @@
 
 #include <QWidget>
 
+class QNetworkAccessManager;
+
 class CPTZControlWidget : public QWidget
 {
     Q_OBJECT
@@ -34,6 +36,10 @@ private slots:
 
 private:
     void setupUi();
+    void sendPtzRequest(const QString &command);
+    
+    QNetworkAccessManager *m_networkManager;
+    int m_step;
 };
 
 #endif // CPTZCONTROLWIDGET_H
