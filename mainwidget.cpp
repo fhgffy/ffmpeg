@@ -1,12 +1,12 @@
 ﻿#include "mainwidget.h"
 #include "ui_mainwidget.h"
 #include "cwindowinfowidget.h"
-#include "cdevicelistwidget.h" // 包含新头文件
+#include "cdevicelistwidget.h" //设备列表
 #include <QPainter>
 #include <QDebug>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
-#include "cptzcontrolwidget.h" // 新增头文件
+#include "cptzcontrolwidget.h"
 
 MainWidget::MainWidget(QWidget *parent)
     : CFrameLessWidgetBase(parent)
