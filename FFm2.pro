@@ -20,6 +20,7 @@ SOURCES += \
     cframelesswidgetbase.cpp \
     copenfilebutton.cpp \
     cptzcontrolwidget.cpp \
+    cryptstring.cpp \
     ctimeslider.cpp \
     ctopmenubar.cpp \
     cvideowidgettopwidget.cpp \
@@ -33,6 +34,7 @@ HEADERS += \
     cframelesswidgetbase.h \
     copenfilebutton.h \
     cptzcontrolwidget.h \
+    cryptstring.h \
     ctimeslider.h \
     ctopmenubar.h \
     cvideowidgettopwidget.h \
