@@ -42,7 +42,11 @@ void MainWidget::initLayout()
 {
     // 全局水平布局: [左侧] [中间视频] [右侧]
     QHBoxLayout *globalLayout = new QHBoxLayout(this);
-    globalLayout->setContentsMargins(0, 0, 0, 0);
+
+    // 修改处：将顶部边距从 0 改为 35 (或菜单栏的实际高度)
+    // 这样左侧信息栏、中间视频和右侧设备列表都会向下偏移，不会被菜单栏遮挡
+    globalLayout->setContentsMargins(0, 35, 0, 0);
+
     globalLayout->setSpacing(2); // 栏目间留一点缝隙
 
     // --- 左侧：窗口信息 ---
