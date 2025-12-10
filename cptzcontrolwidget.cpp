@@ -1,4 +1,5 @@
 ﻿#include "cptzcontrolwidget.h"
+#include "cryptstring.h"
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QPushButton>
@@ -10,7 +11,7 @@
 #include <QNetworkReply>
 #include <QUrl>
 #include <QUrlQuery>
-
+#include <QTimer>
 void CPTZControlWidget::onBtnCenterClicked() {
     qDebug() << "Center/Stop Clicked -> Emitting Signal"; // 添加日志方便调试
     sendPtzRequest("s");  // Send PTZ request for center/stop
@@ -22,14 +23,15 @@ void CPTZControlWidget::sendPtzRequest(const QString &command)
     // Construct the API URL
     QUrl url("http://192.168.6.100/xsw/api/ptz/control");
 
-    // Build query parameters
-    QUrlQuery query;
-    query.addQueryItem("value", command);
-    query.addQueryItem("stop", "1");
-    query.addQueryItem("steps", QString::number(m_step));
+    // Build query parameters using KVQuery for authentication
+    KVQuery kvQuery;
+    kvQuery.add("value", command.toStdString());
+    kvQuery.add("stop", "1");
+    kvQuery.add("steps", std::to_string(m_step));
 
-    // Set the query on the URL
-    url.setQuery(query);
+    // Get the authenticated query string with token
+    std::string queryString = kvQuery.toCrpytString();
+    url.setQuery(QString::fromStdString(queryString));
 
     // Create the request
     QNetworkRequest request(url);
@@ -58,6 +60,13 @@ CPTZControlWidget::CPTZControlWidget(QWidget *parent) : QWidget(parent)
 {
     m_networkManager = new QNetworkAccessManager(this);
     m_step = 5;  // Default step value
+    m_stopTimer = new QTimer(this);
+        m_stopTimer->setSingleShot(true); // 只触发一次
+        connect(m_stopTimer, &QTimer::timeout, this, [this](){
+            qDebug() << "自动发送 stop s！";
+            sendPtzRequest("s");
+        });
+
     setupUi();
 }
 
@@ -233,34 +242,51 @@ void CPTZControlWidget::setupUi()
 void CPTZControlWidget::onBtnUpClicked() {
     qDebug() << "Up";
     sendPtzRequest("u");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
+
 }
 void CPTZControlWidget::onBtnDownClicked() {
     qDebug() << "Down";
     sendPtzRequest("d");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnLeftClicked() {
     qDebug() << "Left";
     sendPtzRequest("l");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnRightClicked() {
     qDebug() << "Right";
     sendPtzRequest("r");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnUpLeftClicked() {
     qDebug() << "UpLeft";
     sendPtzRequest("1");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnUpRightClicked() {
     qDebug() << "UpRight";
     sendPtzRequest("2");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnDownLeftClicked() {
     qDebug() << "DownLeft";
     sendPtzRequest("3");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnDownRightClicked() {
     qDebug() << "DownRight";
     sendPtzRequest("4");
+    // 重置自动停止计时器
+        m_stopTimer->start(1000);   // 1 秒后自动发送 s 停止
 }
 void CPTZControlWidget::onBtnZoomInClicked() {
     qDebug() << "Zoom In";

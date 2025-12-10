@@ -16,8 +16,10 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    calarmwidget.cpp \
     cdevicelistwidget.cpp \
     cframelesswidgetbase.cpp \
+    clogquerywidget.cpp \
     copenfilebutton.cpp \
     cptzcontrolwidget.cpp \
     cryptstring.cpp \
@@ -30,8 +32,10 @@ SOURCES += \
     mainwidget.cpp
 
 HEADERS += \
+    calarmwidget.h \
     cdevicelistwidget.h \
     cframelesswidgetbase.h \
+    clogquerywidget.h \
     copenfilebutton.h \
     cptzcontrolwidget.h \
     cryptstring.h \

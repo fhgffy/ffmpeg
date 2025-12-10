@@ -40,6 +40,8 @@ private:
 
     QNetworkAccessManager *m_networkManager;
     int m_step;
+    QTimer *m_stopTimer;
+
 };
 
 #endif // CPTZCONTROLWIDGET_H
