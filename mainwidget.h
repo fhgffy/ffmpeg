@@ -51,11 +51,12 @@ private slots:
         void onSwitchToMonitor();
         void onSwitchToLogQuery();
         void onSwitchToPlayback();  // 切到回放
-        void onSimulateAlarm(); // 【新增】用来模拟触发报警的槽函数
+
 private:
     Ui::MainWidget *ui;
     unique_ptr<FFmpegKits> _ffmpegKits;
 
+    void detectMotion(const QImage& currentImage); // 【新增】移动侦测算法
     // 状态
     PLAYER_STATE _kPlayState;
     bool _hFlip;
@@ -76,7 +77,8 @@ private:
     QWidget* m_pMonitorPage = nullptr;          // 监控页容器
     CLogQueryWidget* m_pLogQueryPage = nullptr; // 日志页
 
-    QTimer* m_pAlarmTimer = nullptr; // 【新增】模拟报警定时器
+    QImage m_lastFrame;     // 【新增】保存上一帧画面用于对比
+    qint64 m_lastAlarmTime = 0; // 【新增】控制报警频率，防止一秒报警25次
     // 辅助
     void initLayout();
     bool eventFilter(QObject *watched, QEvent *event) override;

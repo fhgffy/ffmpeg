@@ -144,10 +144,7 @@ void MainWidget::initLayout()
         ui->widget->hide();
         ui->widget->setParent(nullptr);
     }
-    // 模拟每隔 5-10 秒触发一次报警
-    m_pAlarmTimer = new QTimer(this);
-    connect(m_pAlarmTimer, &QTimer::timeout, this, &MainWidget::onSimulateAlarm);
-    m_pAlarmTimer->start(5000); // 5秒触发一次抓拍
+
 }
 
 // ---------------------------------------------------------
@@ -254,6 +251,8 @@ void MainWidget::getOneFrame(QImage image)
     if(_kPlayState == PLAYER_PAUSE) return;
 
     _image = image;
+    // 【新增】在这里调用移动侦测算法
+        detectMotion(_image);
     // 刷新视频区域
     if(m_pVideoArea) m_pVideoArea->update();
 }
@@ -285,32 +284,66 @@ bool MainWidget::eventFilter(QObject *watched, QEvent *event)
     return CFrameLessWidgetBase::eventFilter(watched, event);
 }
 
-void MainWidget::onSimulateAlarm()
+void MainWidget::detectMotion(const QImage& currentImage)
 {
-    // 1. 检查当前是否有视频画面
-    if (_image.isNull()) {
-        return; // 如果没视频，就不抓拍
+    // 1. 频率控制：改为 1 秒检测一次，方便测试（太快了容易刷屏，太慢了容易漏掉）
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (now - m_lastAlarmTime < 1000) {
+        return;
     }
 
-    // 2. 抓拍当前画面 (深拷贝一份，防止多线程冲突)
-    QImage snapshot = _image.copy();
-
-    // 3. 缩放一下图片，作为缩略图存储（可选，为了列表显示不占太大内存）
-    // snapshot = snapshot.scaled(160, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
-    // 4. 随机模拟一个报警类型 (实际项目中这里应该是根据协议判断)
-    QString type;
-    QString content;
-    if (qrand() % 2 == 0) {
-        type = "移动侦测";
-        content = "画面有变动";
-    } else {
-        type = "人脸识别";
-        content = "识别到陌生人";
+    // 2. 初始化上一帧
+    if (m_lastFrame.isNull()) {
+        m_lastFrame = currentImage;
+        return;
     }
 
-    // 5. 将抓拍到的真实图片传给左下角的控件
-    if (m_pAlarmWidget) {
-        m_pAlarmWidget->addAlarm(type, content, snapshot);
+    // 3. 图像处理：缩放到 100x100 (增加一些分辨率以识别更小的物体)
+    // 使用 IgnoreAspectRatio 强制拉伸，方便循环遍历，不影响检测逻辑
+    QImage smallCur = currentImage.scaled(100, 100, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    QImage smallLast = m_lastFrame.scaled(100, 100, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+    // 4. 核心算法：统计【变化像素点】的个数
+    int changedPixelCount = 0;
+    int sensitivity = 30; // 灵敏度：单个像素RGB变化超过30就算“变了” (范围0-765)
+
+    for (int y = 0; y < 100; y++) {
+        for (int x = 0; x < 100; x++) {
+            QColor c1 = smallCur.pixelColor(x, y);
+            QColor c2 = smallLast.pixelColor(x, y);
+
+            // 计算单个像素的差异
+            int diff = qAbs(c1.red() - c2.red()) +
+                       qAbs(c1.green() - c2.green()) +
+                       qAbs(c1.blue() - c2.blue());
+
+            // 如果这个像素变化明显，计数器+1
+            if (diff > sensitivity) {
+                changedPixelCount++;
+            }
+        }
+    }
+
+    // 5. 更新上一帧
+    m_lastFrame = currentImage;
+
+    // 6. 调试输出！(非常重要，请看控制台打印的数字)
+    // 理论上 100x100 = 10000 个像素
+    // 如果有人走动，变化的像素通常在 20 - 500 之间
+    qDebug() << "移动检测 -> 变化点数:" << changedPixelCount;
+
+    // 7. 触发阈值：如果有超过 15 个像素点发生了变化，就报警
+    // 你可以根据控制台打印的值，调整这个 15
+    if (changedPixelCount > 15) {
+        qDebug() << ">>> 触发报警！抓拍！";
+
+        if (m_pAlarmWidget) {
+            // 抓拍
+            QImage snapshot = currentImage.copy();
+            m_pAlarmWidget->addAlarm("移动侦测", "画面检测到异动", snapshot);
+        }
+
+        // 更新报警时间
+        m_lastAlarmTime = now;
     }
 }
