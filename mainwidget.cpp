@@ -10,6 +10,8 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QDateTime>
+#include "faceregisterdialog.h"
+#include <QNetworkInterface>
 
 MainWidget::MainWidget(QWidget *parent)
     : CFrameLessWidgetBase(parent)
@@ -38,6 +40,11 @@ MainWidget::MainWidget(QWidget *parent)
     // 点击“视频回放” -> 切换到监控页并播放录像流
     connect(m_pTopMenuBar, &CTopMenuBar::sig_VideoPlayback,
             this, &MainWidget::onSwitchToPlayback);
+    // 【修改】连接 "人脸注册" -> 打开注册弹窗
+        // 原来是 sig_ElectronicMap，现在改为 sig_FaceRegister
+        // 目标槽函数是我们上一轮写好的 onOpenRegisterDialog
+        connect(m_pTopMenuBar, &CTopMenuBar::sig_FaceRegister,
+                this, &MainWidget::onOpenRegisterDialog);
 
     // 点击“日志查询” -> 切换到日志页
     connect(m_pTopMenuBar, &CTopMenuBar::sig_LogQuery,
@@ -53,6 +60,27 @@ MainWidget::MainWidget(QWidget *parent)
 
     // 默认启动进入视频监控模式
     onSwitchToMonitor();
+
+    // 1. 启动报警回调服务器 (监听 9999 端口)
+        m_server = new NotificationServer(this);
+        m_server->startServer(9999);
+
+        // 2. 连接报警信号 -> 更新左下角图文警情
+        connect(m_server, &NotificationServer::sigAlarmReceived, this, [this](QString type, QString content, QString time, QImage img){
+            // 直接调用之前写好的 addAlarm
+            if(m_pAlarmWidget) {
+                m_pAlarmWidget->addAlarm(type, content, img);
+            }
+        });
+
+        // 3. 初始化 API 管理器 (用于配置回调)
+        m_faceManager = new FaceApiManager(this);
+
+        // 可以在菜单栏加一个“人脸注册”按钮，或者在初始化时自动配置回调
+        // 比如：程序启动时，告诉摄像头：“我的IP是本机IP，端口9999，有报警发给我”
+        // 获取本机IP需要用到 QNetworkInterface，这里简单写死本机局域网IP演示
+        // 实际项目中建议写一个“系统设置”界面来填这些参数
+        m_faceManager->setCallback("192.168.6.100", "admin", "admin", "192.168.6.6", 9999);
 }
 
 MainWidget::~MainWidget()
@@ -346,4 +374,39 @@ void MainWidget::detectMotion(const QImage& currentImage)
         // 更新报警时间
         m_lastAlarmTime = now;
     }
+}
+
+// 【新增实现 1】打开人脸注册窗口
+void MainWidget::onOpenRegisterDialog()
+{
+    FaceRegisterDialog dlg(this);
+    dlg.exec();
+}
+
+// 【新增实现 2】配置报警回调
+void MainWidget::onConfigCallback()
+{
+    if (!m_faceManager) return;
+
+    // 获取本机 IP 地址 (自动查找非 localhost 的第一个 IPv4 地址)
+    QString myIp;
+    const QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
+    for (const QHostAddress &entry : ipAddressesList) {
+        if (entry != QHostAddress::LocalHost && entry.toIPv4Address()) {
+            myIp = entry.toString();
+            break;
+        }
+    }
+
+    if (myIp.isEmpty()) {
+        qDebug() << "无法获取本机IP，配置回调失败";
+        return;
+    }
+
+    qDebug() << "正在配置回调，本机IP:" << myIp;
+
+    // 调用 FaceApiManager 设置回调
+    // 参数：摄像头IP, 用户名, 密码, 本机IP, 本机监听端口
+    // 注意：这里摄像头信息暂时写死，实际应从配置读取
+    m_faceManager->setCallback("192.168.6.100", "admin", "admin", myIp, 9999);
 }

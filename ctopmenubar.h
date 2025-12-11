@@ -19,7 +19,7 @@ public:
 signals:
     void sig_VideoMonitor();
     void sig_VideoPlayback();
-    void sig_ElectronicMap();
+    void sig_FaceRegister(); // 【修改】原 sig_ElectronicMap 改为 sig_FaceRegister
     void sig_LogQuery();
     void sig_SystemSettings();
 
@@ -42,7 +42,7 @@ private:
     QLabel* m_pTitleLabel = nullptr;
     QPushButton* m_pVideoMonitorBtn = nullptr;
     QPushButton* m_pVideoPlaybackBtn = nullptr;
-    QPushButton* m_pElectronicMapBtn = nullptr;
+    QPushButton* m_pFaceRegisterBtn = nullptr; // 【修改】变量名顺便改一下，原 m_pElectronicMapBtn
     QPushButton* m_pLogQueryBtn = nullptr;
     QPushButton* m_pSystemSettingsBtn = nullptr;
     QPushButton* m_pMinBtn = nullptr;

@@ -1,8 +1,8 @@
 ﻿#ifndef MAINWIDGET_H
 #define MAINWIDGET_H
 
-#include "FFmpegKits.h"
-#include "CFrameLessWidgetBase.h"
+#include "ffmpegkits.h"
+#include "cframelesswidgetbase.h"
 #include <QWidget>
 #include <QImage>
 #include "ctopmenubar.h"
@@ -10,6 +10,10 @@
 #include "clogquerywidget.h" // 确保有这个头文件
 #include <QStackedWidget>
 #include "calarmwidget.h"
+#include "notificationserver.h"
+#include "faceapimanager.h"
+#include "faceregisterdialog.h"
+#include "csystemsettingswidget.h"
 // 1. 将枚举定义移到类外面，解决编译错误
 enum PLAYER_STATE
 {
@@ -52,6 +56,10 @@ private slots:
         void onSwitchToLogQuery();
         void onSwitchToPlayback();  // 切到回放
 
+        void onOpenRegisterDialog(); // 打开注册窗口
+        void onConfigCallback();     // 自动配置回调
+
+
 private:
     Ui::MainWidget *ui;
     unique_ptr<FFmpegKits> _ffmpegKits;
@@ -82,5 +90,9 @@ private:
     // 辅助
     void initLayout();
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+    NotificationServer *m_server;
+    FaceApiManager *m_faceManager;
+
 };
 #endif // MAINWIDGET_H

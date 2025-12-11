@@ -90,11 +90,11 @@ void CTopMenuBar::initUI()
 
     m_pVideoMonitorBtn   = createMenuButton(u8"视频监控",   ":/ToolBar/video_monitor.png");
     m_pVideoPlaybackBtn  = createMenuButton(u8"视频回放",   ":/ToolBar/video_playback.png");
-    m_pElectronicMapBtn  = createMenuButton(u8"电子地图",   ":/ToolBar/map.png");
+    m_pFaceRegisterBtn   = createMenuButton(u8"人脸注册",   ":/ToolBar/map.png"); // 文字改了，图标没动
     m_pLogQueryBtn       = createMenuButton(u8"日志查询",   ":/ToolBar/log.png");
     m_pSystemSettingsBtn = createMenuButton(u8"系统设置",   ":/ToolBar/system.png");
 
-    for (auto* btn : { m_pVideoMonitorBtn, m_pVideoPlaybackBtn, m_pElectronicMapBtn,
+    for (auto* btn : { m_pVideoMonitorBtn, m_pVideoPlaybackBtn, m_pFaceRegisterBtn,
                        m_pLogQueryBtn, m_pSystemSettingsBtn }) {
         btn->setStyleSheet(btnStyle);
         btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -146,7 +146,7 @@ void CTopMenuBar::initUI()
     // 连接信号
     connect(m_pVideoMonitorBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_VideoMonitor);
     connect(m_pVideoPlaybackBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_VideoPlayback);
-    connect(m_pElectronicMapBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_ElectronicMap);
+    connect(m_pFaceRegisterBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_FaceRegister); // 关联新信号
     connect(m_pLogQueryBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_LogQuery);
     connect(m_pSystemSettingsBtn, &QPushButton::clicked, this, &CTopMenuBar::sig_SystemSettings);
 

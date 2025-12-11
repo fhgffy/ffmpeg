@@ -23,13 +23,17 @@ SOURCES += \
     copenfilebutton.cpp \
     cptzcontrolwidget.cpp \
     cryptstring.cpp \
+    csystemsettingswidget.cpp \
     ctimeslider.cpp \
     ctopmenubar.cpp \
     cvideowidgettopwidget.cpp \
     cwindowinfowidget.cpp \
+    faceapimanager.cpp \
+    faceregisterdialog.cpp \
     ffmpegkits.cpp \
     main.cpp \
-    mainwidget.cpp
+    mainwidget.cpp \
+    notificationserver.cpp
 
 HEADERS += \
     calarmwidget.h \
@@ -39,12 +43,16 @@ HEADERS += \
     copenfilebutton.h \
     cptzcontrolwidget.h \
     cryptstring.h \
+    csystemsettingswidget.h \
     ctimeslider.h \
     ctopmenubar.h \
     cvideowidgettopwidget.h \
     cwindowinfowidget.h \
+    faceapimanager.h \
+    faceregisterdialog.h \
     ffmpegkits.h \
-    mainwidget.h
+    mainwidget.h \
+    notificationserver.h
 
 FORMS += \
     mainwidget.ui
