@@ -3,8 +3,9 @@
 #include "cwindowinfowidget.h"
 #include "cdevicelistwidget.h"
 #include "cptzcontrolwidget.h"
-#include "clogquerywidget.h"  // 【必需】日志查询窗口头文件
-#include "cryptstring.h"      // 【必需】Token生成工具
+#include "clogquerywidget.h"
+#include "csystemsettingswidget.h" // 【必需】系统设置
+#include "cryptstring.h"
 #include <QPainter>
 #include <QDebug>
 #include <QHBoxLayout>
@@ -40,15 +41,18 @@ MainWidget::MainWidget(QWidget *parent)
     // 点击“视频回放” -> 切换到监控页并播放录像流
     connect(m_pTopMenuBar, &CTopMenuBar::sig_VideoPlayback,
             this, &MainWidget::onSwitchToPlayback);
-    // 【修改】连接 "人脸注册" -> 打开注册弹窗
-        // 原来是 sig_ElectronicMap，现在改为 sig_FaceRegister
-        // 目标槽函数是我们上一轮写好的 onOpenRegisterDialog
-        connect(m_pTopMenuBar, &CTopMenuBar::sig_FaceRegister,
-                this, &MainWidget::onOpenRegisterDialog);
+
+    // 点击 "人脸注册" -> 打开注册弹窗
+    connect(m_pTopMenuBar, &CTopMenuBar::sig_FaceRegister,
+            this, &MainWidget::onOpenRegisterDialog);
 
     // 点击“日志查询” -> 切换到日志页
     connect(m_pTopMenuBar, &CTopMenuBar::sig_LogQuery,
             this, &MainWidget::onSwitchToLogQuery);
+
+    // 【新增】点击“系统设置” -> 切换到设置页
+    connect(m_pTopMenuBar, &CTopMenuBar::sig_SystemSettings,
+            this, &MainWidget::onSwitchToSystemSettings);
 
     // ================= 云台反转信号 =================
     if (m_pPTZControlWidget) {
@@ -58,29 +62,32 @@ MainWidget::MainWidget(QWidget *parent)
         });
     }
 
+    // 1. 启动报警回调服务器 (监听 9999 端口)
+    m_server = new NotificationServer(this);
+    m_server->startServer(9999);
+
+    // 2. 连接报警信号 -> 更新左下角图文警情
+    connect(m_server, &NotificationServer::sigAlarmReceived, this, [this](QString type, QString content, QString time, QImage img){
+        if(m_pAlarmWidget) {
+            m_pAlarmWidget->addAlarm(type, content, img);
+        }
+    });
+
+    // 3. 初始化 API 管理器
+    m_faceManager = new FaceApiManager(this);
+
+    // 【新增】连接系统设置页面的“配置修改”信号
+    // 当用户在设置页点击保存时，自动重新配置回调地址
+    if (m_pSystemSettingsPage) {
+        connect(m_pSystemSettingsPage, &CSystemSettingsWidget::sigConfigChanged,
+                this, &MainWidget::onConfigCallback);
+    }
+
+    // 4. 应用初始配置 (从文件加载)
+    onConfigCallback();
+
     // 默认启动进入视频监控模式
     onSwitchToMonitor();
-
-    // 1. 启动报警回调服务器 (监听 9999 端口)
-        m_server = new NotificationServer(this);
-        m_server->startServer(9999);
-
-        // 2. 连接报警信号 -> 更新左下角图文警情
-        connect(m_server, &NotificationServer::sigAlarmReceived, this, [this](QString type, QString content, QString time, QImage img){
-            // 直接调用之前写好的 addAlarm
-            if(m_pAlarmWidget) {
-                m_pAlarmWidget->addAlarm(type, content, img);
-            }
-        });
-
-        // 3. 初始化 API 管理器 (用于配置回调)
-        m_faceManager = new FaceApiManager(this);
-
-        // 可以在菜单栏加一个“人脸注册”按钮，或者在初始化时自动配置回调
-        // 比如：程序启动时，告诉摄像头：“我的IP是本机IP，端口9999，有报警发给我”
-        // 获取本机IP需要用到 QNetworkInterface，这里简单写死本机局域网IP演示
-        // 实际项目中建议写一个“系统设置”界面来填这些参数
-        m_faceManager->setCallback("192.168.6.100", "admin", "admin", "192.168.6.6", 9999);
 }
 
 MainWidget::~MainWidget()
@@ -106,29 +113,26 @@ void MainWidget::initLayout()
     QHBoxLayout *monitorLayout = new QHBoxLayout(m_pMonitorPage);
     monitorLayout->setContentsMargins(0, 0, 0, 0);
     monitorLayout->setSpacing(2);
-    //左侧
+
+    // [左侧] 面板
     m_pLeftPanel = new QWidget(m_pMonitorPage);
-        m_pLeftPanel->setFixedWidth(240);
-        m_pLeftPanel->setStyleSheet("background-color: #2d2d2d;"); // 统一左侧背景色
+    m_pLeftPanel->setFixedWidth(240);
+    m_pLeftPanel->setStyleSheet("background-color: #2d2d2d;");
 
-        QVBoxLayout *leftLayout = new QVBoxLayout(m_pLeftPanel);
-        leftLayout->setContentsMargins(0, 0, 0, 0);
-        leftLayout->setSpacing(1); // 两个控件之间留1px缝隙
+    QVBoxLayout *leftLayout = new QVBoxLayout(m_pLeftPanel);
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    leftLayout->setSpacing(1);
 
-        // 1. 上半部分：窗口信息
-        m_pWindowInfoWidget = new CWindowInfoWidget(m_pLeftPanel);
-        // 注意：不再需要 setFixedWidth，由父容器 m_pLeftPanel 控制宽度
-        m_pWindowInfoWidget->addMessage("系统初始化完成");
+    // 1. 上半部分：窗口信息
+    m_pWindowInfoWidget = new CWindowInfoWidget(m_pLeftPanel);
+    m_pWindowInfoWidget->addMessage("系统初始化完成");
 
-        // 2. 下半部分：图文警情 【新增】
-        m_pAlarmWidget = new CAlarmWidget(m_pLeftPanel);
+    // 2. 下半部分：图文警情
+    m_pAlarmWidget = new CAlarmWidget(m_pLeftPanel);
 
-        // 添加到左侧布局，设置伸缩因子，例如 4:6 分配高度
-        leftLayout->addWidget(m_pWindowInfoWidget, 4);
-        leftLayout->addWidget(m_pAlarmWidget, 6);
-
-        // 将左侧面板加入监控页布局
-        monitorLayout->addWidget(m_pLeftPanel);
+    leftLayout->addWidget(m_pWindowInfoWidget, 4);
+    leftLayout->addWidget(m_pAlarmWidget, 6);
+    monitorLayout->addWidget(m_pLeftPanel);
 
     // [中间] 视频区域
     m_pVideoArea = new QWidget(m_pMonitorPage);
@@ -155,14 +159,23 @@ void MainWidget::initLayout()
     // Page 1: 日志查询页面 (Log Page)
     // ==================================================
     m_pLogQueryPage = new CLogQueryWidget(this);
-    // 保持深色风格
     m_pLogQueryPage->setStyleSheet("QWidget { background-color: #2d2d2d; color: #cccccc; }");
+
+    // ==================================================
+    // Page 2: 系统设置页面 (Settings Page) 【新增】
+    // ==================================================
+    m_pSystemSettingsPage = new CSystemSettingsWidget(this);
+    // 保持深色风格，与整体一致
+    m_pSystemSettingsPage->setStyleSheet("QWidget { background-color: #2d2d2d; color: #cccccc; }"
+                                         "QGroupBox { border: 1px solid #505050; margin-top: 10px; }"
+                                         "QComboBox, QLineEdit, QSpinBox { background-color: #3e3e3e; color: white; border: 1px solid #505050; }");
 
     // ==================================================
     // 添加到堆栈
     // ==================================================
-    m_pStackedWidget->addWidget(m_pMonitorPage);  // Index 0
-    m_pStackedWidget->addWidget(m_pLogQueryPage); // Index 1
+    m_pStackedWidget->addWidget(m_pMonitorPage);      // Index 0
+    m_pStackedWidget->addWidget(m_pLogQueryPage);     // Index 1
+    m_pStackedWidget->addWidget(m_pSystemSettingsPage); // Index 2
 
     // 将堆栈窗口添加到主布局
     globalLayout->addWidget(m_pStackedWidget);
@@ -172,84 +185,84 @@ void MainWidget::initLayout()
         ui->widget->hide();
         ui->widget->setParent(nullptr);
     }
-
 }
 
 // ---------------------------------------------------------
 // 页面切换槽函数
 // ---------------------------------------------------------
 
-// 切换到：视频监控 (实时流)
+// 切换到：视频监控 (Index 0)
 void MainWidget::onSwitchToMonitor()
 {
-    // 1. 切到监控页
     m_pStackedWidget->setCurrentIndex(0);
-
-    // 2. 播放实时 RTSP 流
-    startPlayLogic();
+    startPlayLogic(); // 播放实时流
 }
 
-// 切换到：监控回放 (HLS流)
+// 切换到：监控回放 (Index 0)
 void MainWidget::onSwitchToPlayback()
 {
-    // 1. 切到监控页 (回放也是在视频窗口看)
+    // 回放也是在视频窗口看 (Index 0)，只是播放源变了
     m_pStackedWidget->setCurrentIndex(0);
-
-    // 2. 执行回放逻辑
     onVideoPlaybackLogic();
 }
 
-// 切换到：日志查询
+// 切换到：日志查询 (Index 1)
 void MainWidget::onSwitchToLogQuery()
 {
-    // 1. 切到日志页
     m_pStackedWidget->setCurrentIndex(1);
-
     if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("切换至日志查询页面");
+}
+
+// 【新增】切换到：系统设置 (Index 2)
+void MainWidget::onSwitchToSystemSettings()
+{
+    m_pStackedWidget->setCurrentIndex(2);
+    if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("切换至系统设置页面");
 }
 
 // ---------------------------------------------------------
 // 业务逻辑函数
 // ---------------------------------------------------------
 
-// 实时监控逻辑
 void MainWidget::startPlayLogic()
 {
-    // IP 需要根据你的实际环境修改，这里保持和云台一致
-    QString url = "rtsp://admin:admin@192.168.6.100/live/chn=0";
+    // 【修改】优先从系统配置获取 IP，如果没有则用默认
+    QString ip = "192.168.6.100";
+    if (m_pSystemSettingsPage) {
+        QString cfgIp = m_pSystemSettingsPage->getDeviceIp();
+        if(!cfgIp.isEmpty()) ip = cfgIp;
+    }
+
+    QString url = QString("rtsp://admin:admin@%1/live/chn=0").arg(ip);
 
     if(m_pWindowInfoWidget)
         m_pWindowInfoWidget->addMessage("启动实时监控: " + url);
 
-    // FFmpegKits 内部会自动处理停止旧线程
     _ffmpegKits->startPlay(url);
     _kPlayState = PLAYER_PLAYING;
 }
 
-// 视频回放逻辑 (生成 Token 并播放)
 void MainWidget::onVideoPlaybackLogic()
 {
-    // 1. 设置时间范围 (例如：过去1小时)
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     qint64 startTime = now - 3600 * 1000;
     qint64 endTime = now;
 
-    // 【修正】IP 修改为 192.168.6.100 (与云台控制成功的 IP 一致)
+    // 【修改】从配置获取 IP
     QString deviceIp = "192.168.6.100";
+    if (m_pSystemSettingsPage) {
+        QString cfgIp = m_pSystemSettingsPage->getDeviceIp();
+        if(!cfgIp.isEmpty()) deviceIp = cfgIp;
+    }
 
-    // 尝试使用加密接口 /xsw/
     QString baseUrl = QString("http://%1/xsw/api/record/hls/vod/index.m3u8").arg(deviceIp);
 
-    // 2. 构建参数
     KVQuery query;
     query.add("start_time", std::to_string(startTime));
     query.add("end_time", std::to_string(endTime));
     query.add("channel", "0");
 
-    // 3. 生成带签名 Token 的参数字符串
     QString queryString = QString::fromStdString(query.toCrpytString());
-
-    // 4. 拼接完整 URL 【关键定义】
     QString fullUrl = baseUrl + "?" + queryString;
 
     qDebug() << "【视频回放】请求URL:" << fullUrl;
@@ -257,7 +270,6 @@ void MainWidget::onVideoPlaybackLogic()
     if(m_pWindowInfoWidget)
         m_pWindowInfoWidget->addMessage("请求回放录像...");
 
-    // 5. 启动播放
     if (_ffmpegKits) {
         _ffmpegKits->startPlay(fullUrl);
         _kPlayState = PLAYER_PLAYING;
@@ -270,7 +282,6 @@ void MainWidget::flipLogic()
     if(m_pWindowInfoWidget)
         m_pWindowInfoWidget->addMessage(QString("图像翻转: %1").arg(_hFlip ? "开" : "关"));
 
-    // 触发重绘
     if(m_pVideoArea) m_pVideoArea->update();
 }
 
@@ -279,29 +290,24 @@ void MainWidget::getOneFrame(QImage image)
     if(_kPlayState == PLAYER_PAUSE) return;
 
     _image = image;
-    // 【新增】在这里调用移动侦测算法
-        detectMotion(_image);
-    // 刷新视频区域
+    detectMotion(_image);
     if(m_pVideoArea) m_pVideoArea->update();
 }
 
 bool MainWidget::eventFilter(QObject *watched, QEvent *event)
 {
-    // 只处理视频区域的绘图事件
     if (watched == m_pVideoArea && event->type() == QEvent::Paint)
     {
         QPainter painter(m_pVideoArea);
         int w = m_pVideoArea->width();
         int h = m_pVideoArea->height();
 
-        // 黑色背景
         painter.fillRect(0, 0, w, h, Qt::black);
 
         if (!_image.isNull())
         {
-            // 保持比例缩放
             QImage img = _image.scaled(QSize(w, h), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            img = img.mirrored(_hFlip, _vFlip); // 处理翻转
+            img = img.mirrored(_hFlip, _vFlip);
 
             int x = (w - img.width()) / 2;
             int y = (h - img.height()) / 2;
@@ -314,99 +320,88 @@ bool MainWidget::eventFilter(QObject *watched, QEvent *event)
 
 void MainWidget::detectMotion(const QImage& currentImage)
 {
-    // 1. 频率控制：改为 1 秒检测一次，方便测试（太快了容易刷屏，太慢了容易漏掉）
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (now - m_lastAlarmTime < 1000) {
         return;
     }
 
-    // 2. 初始化上一帧
     if (m_lastFrame.isNull()) {
         m_lastFrame = currentImage;
         return;
     }
 
-    // 3. 图像处理：缩放到 100x100 (增加一些分辨率以识别更小的物体)
-    // 使用 IgnoreAspectRatio 强制拉伸，方便循环遍历，不影响检测逻辑
     QImage smallCur = currentImage.scaled(100, 100, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     QImage smallLast = m_lastFrame.scaled(100, 100, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
-    // 4. 核心算法：统计【变化像素点】的个数
     int changedPixelCount = 0;
-    int sensitivity = 30; // 灵敏度：单个像素RGB变化超过30就算“变了” (范围0-765)
+    int sensitivity = 30;
 
     for (int y = 0; y < 100; y++) {
         for (int x = 0; x < 100; x++) {
             QColor c1 = smallCur.pixelColor(x, y);
             QColor c2 = smallLast.pixelColor(x, y);
 
-            // 计算单个像素的差异
             int diff = qAbs(c1.red() - c2.red()) +
                        qAbs(c1.green() - c2.green()) +
                        qAbs(c1.blue() - c2.blue());
 
-            // 如果这个像素变化明显，计数器+1
             if (diff > sensitivity) {
                 changedPixelCount++;
             }
         }
     }
 
-    // 5. 更新上一帧
     m_lastFrame = currentImage;
 
-    // 6. 调试输出！(非常重要，请看控制台打印的数字)
-    // 理论上 100x100 = 10000 个像素
-    // 如果有人走动，变化的像素通常在 20 - 500 之间
-    qDebug() << "移动检测 -> 变化点数:" << changedPixelCount;
-
-    // 7. 触发阈值：如果有超过 15 个像素点发生了变化，就报警
-    // 你可以根据控制台打印的值，调整这个 15
     if (changedPixelCount > 15) {
         qDebug() << ">>> 触发报警！抓拍！";
-
         if (m_pAlarmWidget) {
-            // 抓拍
             QImage snapshot = currentImage.copy();
             m_pAlarmWidget->addAlarm("移动侦测", "画面检测到异动", snapshot);
         }
-
-        // 更新报警时间
         m_lastAlarmTime = now;
     }
 }
 
-// 【新增实现 1】打开人脸注册窗口
 void MainWidget::onOpenRegisterDialog()
 {
     FaceRegisterDialog dlg(this);
     dlg.exec();
 }
 
-// 【新增实现 2】配置报警回调
+// 【新增实现】配置报警回调
+// 逻辑：优先使用用户在系统设置里填写的参数，如果没填再自动获取
 void MainWidget::onConfigCallback()
 {
     if (!m_faceManager) return;
+    if (!m_pSystemSettingsPage) return;
 
-    // 获取本机 IP 地址 (自动查找非 localhost 的第一个 IPv4 地址)
-    QString myIp;
-    const QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
-    for (const QHostAddress &entry : ipAddressesList) {
-        if (entry != QHostAddress::LocalHost && entry.toIPv4Address()) {
-            myIp = entry.toString();
-            break;
+    // 1. 尝试从配置页面获取参数
+    QString deviceIp = m_pSystemSettingsPage->getDeviceIp();
+    QString deviceUser = m_pSystemSettingsPage->getDeviceUser();
+    QString devicePwd = m_pSystemSettingsPage->getDevicePwd();
+    QString localIp = m_pSystemSettingsPage->getLocalIp();
+    int localPort = m_pSystemSettingsPage->getLocalPort();
+
+    // 2. 如果配置为空（通常是第一次运行），给一些默认值或尝试自动获取
+    if (deviceIp.isEmpty()) deviceIp = "192.168.6.100";
+    if (deviceUser.isEmpty()) deviceUser = "admin";
+    if (devicePwd.isEmpty()) devicePwd = "admin";
+
+    // 如果本地IP为空，自动获取一个
+    if (localIp.isEmpty()) {
+        const QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
+        for (const QHostAddress &entry : ipAddressesList) {
+            if (entry != QHostAddress::LocalHost && entry.toIPv4Address()) {
+                localIp = entry.toString();
+                break;
+            }
         }
     }
 
-    if (myIp.isEmpty()) {
-        qDebug() << "无法获取本机IP，配置回调失败";
-        return;
-    }
+    qDebug() << "正在配置回调 => Device:" << deviceIp << " Local:" << localIp << ":" << localPort;
 
-    qDebug() << "正在配置回调，本机IP:" << myIp;
-
-    // 调用 FaceApiManager 设置回调
-    // 参数：摄像头IP, 用户名, 密码, 本机IP, 本机监听端口
-    // 注意：这里摄像头信息暂时写死，实际应从配置读取
-    m_faceManager->setCallback("192.168.6.100", "admin", "admin", myIp, 9999);
+    // 3. 调用管理器下发配置
+    m_faceManager->setCallback(deviceIp, deviceUser, devicePwd, localIp, localPort);
 }
+

@@ -7,6 +7,10 @@
 class QLineEdit;
 class QComboBox;
 class QPushButton;
+class QCheckBox;
+class QSlider;
+class QSpinBox;
+class QNetworkAccessManager;
 
 class CSystemSettingsWidget : public QWidget
 {
@@ -27,11 +31,15 @@ signals:
 
 private slots:
     void onSaveClicked();
+    // 【新增】保存图像参数
+    void onSaveImageParamsClicked();
 
 private:
     void setupUi();
     void loadSettings(); // 加载配置
     void initLocalIps(); // 自动扫描本机IP填入下拉框
+    // 【新增】发送API请求帮助函数
+    void sendApiRequest(const QMap<QString, QString>& params);
 
 private:
     // 设备参数
@@ -45,6 +53,20 @@ private:
 
     // 持久化设置
     QSettings *m_settings;
+
+    // 【新增】图像参数控件
+    QCheckBox *m_chkManualExposure; // 手动曝光
+    QSpinBox *m_spinExposureTime;   // 曝光时间
+    QCheckBox *m_chkWhiteLight;     // 全彩模式
+    QComboBox *m_comboLightControl; // 灯光控制模式
+    QSlider *m_sliderLightDepress;  // 强光抑制
+    QSlider *m_sliderBLC;           // 背光补偿
+    QSlider *m_sliderBrightness;    // 亮度
+    QSlider *m_sliderContrast;      // 对比度
+    QSlider *m_sliderSaturation;    // 饱和度
+    QSlider *m_sliderSharpness;     // 锐度
+
+    QNetworkAccessManager *m_netManager;
 };
 
 #endif // CSYSTEMSETTINGSWIDGET_H

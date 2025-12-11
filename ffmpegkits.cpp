@@ -1,5 +1,6 @@
 ﻿#include "ffmpegkits.h"
 #include <QDebug>
+#include <QDateTime>
 
 extern "C"
 {
@@ -12,31 +13,40 @@ extern "C"
 FFmpegKits::FFmpegKits(QObject *parent)
     : QThread(parent)
 {
+    m_isStop = false;
 }
 
 FFmpegKits::~FFmpegKits()
 {
-    stopPlay(); // 析构时确保线程退出
+    stopPlay();
 }
 
 void FFmpegKits::startPlay(QString url)
 {
-    // 【关键修改】如果线程正在运行，先停止它
-        if (this->isRunning()) {
-            stopPlay();
-        }
+    if (this->isRunning()) {
+        stopPlay();
+    }
 
-        _url = url;
-        m_isStop = false; // 重置停止标志
-        this->start();    // 启动新线程
+    _url = url;
+    m_isStop = false;
+    this->start();
 }
-// 【新增】停止播放实现
+
 void FFmpegKits::stopPlay()
 {
-    m_isStop = true; // 设置停止标志
-    this->requestInterruption(); // 请求中断（辅助手段）
+    m_isStop = true;
+    this->requestInterruption();
     this->quit();
-    this->wait();    // 阻塞等待线程安全退出
+    this->wait();
+}
+
+int FFmpegKits::interrupt_cb(void *ctx)
+{
+    FFmpegKits *p = (FFmpegKits*)ctx;
+    if (p->m_isStop) {
+        return 1;
+    }
+    return 0;
 }
 
 void FFmpegKits::run()
@@ -52,28 +62,34 @@ void FFmpegKits::run()
     static struct SwsContext *pImgConvertCtx = nullptr;
 
     avformat_network_init();
-
     pFormatCtx = avformat_alloc_context();
 
-    // ... (中间的字典设置代码保持不变) ...
+    // 设置中断回调
+    pFormatCtx->interrupt_callback.callback = interrupt_cb;
+    pFormatCtx->interrupt_callback.opaque = this;
+
     AVDictionary *avdic=nullptr;
-    char option_key[] = "rtsp_transport";
-    char option_value[] = "udp";
-    av_dict_set(&avdic, option_key, option_value, 0);
-    char option_key2[] = "max_delay";
-    char option_value2[] = "100";
-    av_dict_set(&avdic, option_key2, option_value2, 0);
-    // ...
+    av_dict_set(&avdic, "rtsp_transport", "tcp", 0);
+    av_dict_set(&avdic, "max_delay", "100", 0);
+    av_dict_set(&avdic, "stimeout", "5000000", 0);
+
+    // 【修复1】增加探测大小和时间，解决 Could not find codec parameters
+    // probesize: 20MB (默认是5MB)
+    av_dict_set(&avdic, "probesize", "20480000", 0);
+    // analyzeduration: 10秒 (默认很短)
+    av_dict_set(&avdic, "analyzeduration", "10000000", 0);
 
     if (avformat_open_input(&pFormatCtx, _url.toStdString().data(), nullptr, &avdic) != 0)
     {
         qDebug() << "can't open the file:" << _url;
+        avformat_free_context(pFormatCtx);
         return;
     }
 
     if (avformat_find_stream_info(pFormatCtx, nullptr) < 0)
     {
         qDebug() << "Could't find stream infomation.";
+        avformat_close_input(&pFormatCtx);
         return;
     }
 
@@ -81,27 +97,54 @@ void FFmpegKits::run()
     videoStreamIdx = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
     if(videoStreamIdx < 0) {
         qDebug() << "av_find_best_stream error";
+        avformat_close_input(&pFormatCtx);
         return ;
     }
 
-    pCodec = avcodec_find_decoder(pFormatCtx->streams[videoStreamIdx]->codecpar->codec_id);
+    AVCodecParameters *codecPar = pFormatCtx->streams[videoStreamIdx]->codecpar;
+    pCodec = avcodec_find_decoder(codecPar->codec_id);
     if (pCodec == nullptr) {
         qDebug("Codec not found.\n");
+        avformat_close_input(&pFormatCtx);
         return;
     }
 
     pCodecCtx = avcodec_alloc_context3(pCodec);
-    avcodec_parameters_to_context(pCodecCtx, pFormatCtx->streams[videoStreamIdx]->codecpar);
+    avcodec_parameters_to_context(pCodecCtx, codecPar);
 
     if (avcodec_open2(pCodecCtx, pCodec, nullptr) < 0) {
         printf("Could not open codec.\n");
+        avcodec_free_context(&pCodecCtx);
+        avformat_close_input(&pFormatCtx);
         return;
     }
 
+    // 【修复2】核心防崩溃检查！
+    // 如果获取到的宽高无效，或者像素格式未知，绝对不能进入 sws_getContext
+    if (pCodecCtx->width <= 0 || pCodecCtx->height <= 0 || pCodecCtx->pix_fmt == AV_PIX_FMT_NONE) {
+        qDebug() << "Error: Invalid video properties."
+                 << "Width:" << pCodecCtx->width
+                 << "Height:" << pCodecCtx->height
+                 << "Format:" << pCodecCtx->pix_fmt;
+
+        avcodec_free_context(&pCodecCtx);
+        avformat_close_input(&pFormatCtx);
+        return;
+    }
+
+    // 安全初始化 SWS Context
     pImgConvertCtx = sws_getContext(
         pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,
         pCodecCtx->width, pCodecCtx->height,AV_PIX_FMT_RGB32,
         SWS_BICUBIC, nullptr, nullptr, nullptr);
+
+    // 再次检查 Context 是否创建成功
+    if (!pImgConvertCtx) {
+        qDebug() << "Error: sws_getContext failed!";
+        avcodec_free_context(&pCodecCtx);
+        avformat_close_input(&pFormatCtx);
+        return;
+    }
 
     int numBytes = avpicture_get_size(AV_PIX_FMT_RGB32, pCodecCtx->width,pCodecCtx->height);
 
@@ -113,7 +156,6 @@ void FFmpegKits::run()
 
     pPacket = (AVPacket *) malloc(sizeof(AVPacket));
 
-    // 【关键修改】循环条件增加 !m_isStop
     while (!m_isStop) {
         if (av_read_frame(pFormatCtx, pPacket) < 0) {
             break;
@@ -121,15 +163,16 @@ void FFmpegKits::run()
 
         if (pPacket->stream_index == videoStreamIdx) {
             int got_picture;
-            int ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture,pPacket);
+            int ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, pPacket);
             if (ret < 0) {
-                printf("decode error.\n");
-                // 不要直接return， break出去清理资源
+                // 解码失败不退出，只释放包，继续尝试下一帧
                 av_free_packet(pPacket);
-                break;
+                continue;
             }
 
             if (got_picture) {
+                // 【修复3】转换前也可以加一层保险，防止运行中分辨率突变导致崩溃
+                // 但通常上面的初始化检查已经足够覆盖大部分情况
                 sws_scale(pImgConvertCtx, (uint8_t const * const *) pFrame->data, pFrame->linesize,
                           0, pCodecCtx->height, pFrameRGB->data, pFrameRGB->linesize);
 
@@ -140,22 +183,21 @@ void FFmpegKits::run()
             }
         }
         av_free_packet(pPacket);
-
-        // 【建议】加上这个，让线程有机会响应中断请求
-        if(QThread::currentThread()->isInterruptionRequested()) {
-            m_isStop = true;
-        }
     }
 
     // 资源释放
-    av_free(pOutBuffer);
-    av_free(pFrameRGB);
-    av_free(pFrame);      // 记得释放 pFrame
-    // av_free(pPacket);  // pPacket 是 malloc 的，最后应该 free(pPacket) 或者 av_packet_free
+    if(pOutBuffer) av_free(pOutBuffer);
+    if(pFrameRGB) av_free(pFrameRGB);
+    if(pFrame) av_free(pFrame);
     if(pPacket) free(pPacket);
 
-    avcodec_close(pCodecCtx);
-    avformat_close_input(&pFormatCtx);
+    if(pImgConvertCtx) {
+        sws_freeContext(pImgConvertCtx);
+        pImgConvertCtx = nullptr; // 置空防止野指针
+    }
+
+    if(pCodecCtx) avcodec_close(pCodecCtx);
+    if(pFormatCtx) avformat_close_input(&pFormatCtx);
 
     qDebug() << "FFmpegKits::run finished.";
 }
