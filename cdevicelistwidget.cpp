@@ -11,6 +11,8 @@ CDeviceListWidget::CDeviceListWidget(QWidget *parent) : QWidget(parent)
 {
     setupUi();
     initData();
+    // 【新增】连接双击信号
+    connect(m_treeWidget, &QTreeWidget::itemDoubleClicked, this, &CDeviceListWidget::onItemDoubleClicked);
 }
 
 void CDeviceListWidget::setupUi()
@@ -87,5 +89,21 @@ void CDeviceListWidget::initData()
             QTreeWidgetItem *subStream = new QTreeWidgetItem(cameraItem);
             subStream->setText(0, "子码流");
         }
+    }
+}
+
+// 【新增】双击槽函数实现
+void CDeviceListWidget::onItemDoubleClicked(QTreeWidgetItem *item, int column)
+{
+    // 根据 item 的文本判断是主码流还是子码流
+    QString text = item->text(0);
+
+    if (text == "主码流") {
+        emit sigSwitchStream(0); // 发送 0 代表主码流
+    } else if (text == "子码流") {
+        emit sigSwitchStream(1); // 发送 1 代表子码流
+    } else if (text.contains("网络视频")) {
+        // 如果用户直接双击摄像头名字，默认播放主码流
+        emit sigSwitchStream(0);
     }
 }

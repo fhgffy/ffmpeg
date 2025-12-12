@@ -47,9 +47,12 @@ private slots:
     void getOneFrame(QImage image);
 
     // 业务逻辑槽函数
-    void startPlayLogic(); // 启动实时监控逻辑
+    // 【修改】改为带参数，默认 -1 表示使用当前配置，0/1表示强制指定
+    void startPlayLogic(int channel = 0); // 启动实时监控逻辑
     void flipLogic();      // 翻转逻辑
     void onVideoPlaybackLogic(); // 视频回放逻辑
+    // 【新增】响应设备列表的切换请求
+    void onStreamSwitchRequest(int channel);
 
     // 【修改】页面切换槽函数
     void onSwitchToMonitor();         // 切到监控/回放页 (Index 0)

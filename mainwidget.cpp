@@ -88,6 +88,13 @@ MainWidget::MainWidget(QWidget *parent)
             if(m_pLogQueryPage) m_pLogQueryPage->addLog("云台控制", msg);
         });
     }
+    // ================= 【新增】连接设备列表切换信号 =================
+        if (m_pDeviceListWidget) {
+            connect(m_pDeviceListWidget, &CDeviceListWidget::sigSwitchStream,
+                    this, &MainWidget::onStreamSwitchRequest);
+        }
+        // 默认启动主码流
+            startPlayLogic(0);
 }
 
 MainWidget::~MainWidget()
@@ -193,8 +200,15 @@ void MainWidget::initLayout()
 
 void MainWidget::onSwitchToMonitor()
 {
+    // 【关键修改】索引必须是 0 (对应 m_pMonitorPage)
     m_pStackedWidget->setCurrentIndex(0);
-    startPlayLogic();
+
+    // 【关键修改】回到监控页时，才需要启动播放
+    // 如果您实现了之前的码流切换功能，这里默认传0(主码流)
+    startPlayLogic(0);
+
+    // 记录日志
+    if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("切换至视频监控页面");
 }
 
 void MainWidget::onSwitchToPlayback()
@@ -214,7 +228,13 @@ void MainWidget::onSwitchToLogQuery()
 
 void MainWidget::onSwitchToSystemSettings()
 {
+    // 【关键修改】索引必须是 2 (对应 m_pSystemSettingsPage)
     m_pStackedWidget->setCurrentIndex(2);
+
+    // 【关键修改】进入设置页通常不需要自动播放，甚至可以考虑停止播放以节省资源
+    // startPlayLogic(0);  <-- 这行代码必须删除！
+
+    // 记录日志
     if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("切换至系统设置页面");
     if (m_pLogQueryPage) m_pLogQueryPage->addLog("页面跳转", "进入系统设置页面");
 }
@@ -222,18 +242,40 @@ void MainWidget::onSwitchToSystemSettings()
 // ---------------------------------------------------------
 // 业务逻辑
 // ---------------------------------------------------------
-
-void MainWidget::startPlayLogic()
+// 【修改】实现切换逻辑
+void MainWidget::onStreamSwitchRequest(int channel)
 {
+    QString type = (channel == 0) ? "主码流" : "子码流";
+    if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("正在切换至: " + type);
+
+    // 调用播放逻辑
+    startPlayLogic(channel);
+}
+
+// 【修改】支持动态 channel 参数
+void MainWidget::startPlayLogic(int channel)
+{
+    // 1. 获取 IP 配置
     QString ip = "192.168.6.100";
     if (m_pSystemSettingsPage) {
         QString cfgIp = m_pSystemSettingsPage->getDeviceIp();
         if(!cfgIp.isEmpty()) ip = cfgIp;
     }
-    QString url = QString("rtsp://admin:admin@%1/live/chn=0").arg(ip);
 
-    if(m_pWindowInfoWidget) m_pWindowInfoWidget->addMessage("启动实时监控: " + url);
+    // 2. 构造 URL (核心修改：chn=0 或 chn=1)
+    QString url = QString("rtsp://admin:admin@%1/live/chn=%2").arg(ip).arg(channel);
 
+    qDebug() << ">>> 启动播放 URL:" << url;
+
+    // 3. 记录日志
+    if(m_pWindowInfoWidget) {
+        // 为了避免刷屏，可以只显示关键信息
+        m_pWindowInfoWidget->addMessage(QString("连接流媒体: chn=%1").arg(channel));
+    }
+
+    // 4. 调用 FFmpegKits
+    // 注意：FFmpegKits::startPlay 内部会自动判断 isRunning 并调用 stopPlay
+    // 所以这里直接调用即可，实现了"无缝"衔接的感觉
     _ffmpegKits->startPlay(url);
     _kPlayState = PLAYER_PLAYING;
 }
