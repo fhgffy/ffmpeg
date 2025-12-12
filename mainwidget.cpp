@@ -1,4 +1,5 @@
-﻿#include "mainwidget.h"
+﻿
+#include "mainwidget.h"
 #include "ui_mainwidget.h"
 #include "cwindowinfowidget.h"
 #include "cdevicelistwidget.h"
@@ -13,6 +14,7 @@
 #include <QDateTime>
 #include "faceregisterdialog.h"
 #include <QNetworkInterface>
+#include <QSplitter> // 【新增】引入 QSplitter 头文件
 
 MainWidget::MainWidget(QWidget *parent)
     : CFrameLessWidgetBase(parent)
@@ -105,10 +107,17 @@ void MainWidget::initLayout()
     m_pMonitorPage = new QWidget(this);
     QHBoxLayout *monitorLayout = new QHBoxLayout(m_pMonitorPage);
     monitorLayout->setContentsMargins(0, 0, 0, 0);
-    monitorLayout->setSpacing(2);
+    monitorLayout->setSpacing(0); // 【修改】间距改为0，由Splitter控制
 
-    m_pLeftPanel = new QWidget(m_pMonitorPage);
-    m_pLeftPanel->setFixedWidth(240);
+    // 【新增】创建水平分割器
+    QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, m_pMonitorPage);
+    // 设置分割条样式，使其在深色背景下可见
+    mainSplitter->setStyleSheet("QSplitter::handle { background-color: #404040; border: 1px solid #505050; width: 4px; }");
+
+    // --- 左侧面板 ---
+    m_pLeftPanel = new QWidget(mainSplitter);
+    // m_pLeftPanel->setFixedWidth(240); // 【修改】移除固定宽度
+    m_pLeftPanel->setMinimumWidth(150);  // 【新增】设置最小宽度防止被完全拖没
     m_pLeftPanel->setStyleSheet("background-color: #2d2d2d;");
     QVBoxLayout *leftLayout = new QVBoxLayout(m_pLeftPanel);
     leftLayout->setContentsMargins(0, 0, 0, 0);
@@ -119,15 +128,16 @@ void MainWidget::initLayout()
 
     leftLayout->addWidget(m_pWindowInfoWidget, 4);
     leftLayout->addWidget(m_pAlarmWidget, 6);
-    monitorLayout->addWidget(m_pLeftPanel);
 
-    m_pVideoArea = new QWidget(m_pMonitorPage);
+    // --- 中间视频区 ---
+    m_pVideoArea = new QWidget(mainSplitter);
     m_pVideoArea->setStyleSheet("background-color: black; border: 1px solid #333;");
     m_pVideoArea->installEventFilter(this);
-    monitorLayout->addWidget(m_pVideoArea, 1);
+    m_pVideoArea->setMinimumWidth(400); // 保证视频区最小宽度
 
-    QWidget *rightPanel = new QWidget(m_pMonitorPage);
-    rightPanel->setFixedWidth(240);
+    // --- 右侧面板 ---
+    QWidget *rightPanel = new QWidget(mainSplitter);
+    rightPanel->setFixedWidth(240); // 右侧如果需要伸缩也可以去掉这行
     rightPanel->setStyleSheet("background-color: #2d2d2d;");
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
@@ -137,7 +147,23 @@ void MainWidget::initLayout()
 
     rightLayout->addWidget(m_pDeviceListWidget, 6);
     rightLayout->addWidget(m_pPTZControlWidget, 4);
-    monitorLayout->addWidget(rightPanel);
+
+    // 【新增】将控件加入分割器
+    mainSplitter->addWidget(m_pLeftPanel);
+    mainSplitter->addWidget(m_pVideoArea);
+    mainSplitter->addWidget(rightPanel);
+
+    // 【新增】设置初始宽度比例：左240，中拉伸，右240
+    // 参数列表：[左侧, 中间, 右侧]
+    mainSplitter->setSizes(QList<int>() << 240 << 1000 << 240);
+
+    // 设置拉伸因子：只有中间视频区(索引1)自动拉伸，左右保持设定大小但可拖动
+    mainSplitter->setStretchFactor(0, 0);
+    mainSplitter->setStretchFactor(1, 1);
+    mainSplitter->setStretchFactor(2, 0);
+
+    // 将分割器加入布局
+    monitorLayout->addWidget(mainSplitter);
 
     // Page 1: Log
     m_pLogQueryPage = new CLogQueryWidget(this);
@@ -373,3 +399,4 @@ void MainWidget::onConfigCallback()
 
     m_faceManager->setCallback(deviceIp, deviceUser, devicePwd, localIp, localPort);
 }
+
