@@ -28,11 +28,13 @@ public:
 signals:
     // 当点击“保存并应用”时发送此信号
     void sigConfigChanged();
-
+    // 【新增】消息信号
+    void sigMessage(const QString &msg);
 private slots:
     void onSaveClicked();
     // 【新增】保存图像参数
     void onSaveImageParamsClicked();
+
 
 private:
     void setupUi();

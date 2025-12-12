@@ -169,7 +169,7 @@ void CSystemSettingsWidget::onSaveImageParamsClicked()
     settings.insert("encode.0.vi_param.0.exposure", QString::number(m_spinExposureTime->value()));
     settings.insert("encode.0.vi_param.0.lightControlMode", QString::number(m_comboLightControl->currentIndex())); // 0-3 对应 combo 索引
     settings.insert("encode.0.vi_param.0.lightDepress", QString::number(m_sliderLightDepress->value()));
-
+    emit sigMessage("系统设置: 正在下发图像参数...");
     // 发送请求
     sendApiRequest(settings);
 }
@@ -253,7 +253,7 @@ void CSystemSettingsWidget::onSaveClicked()
     m_settings->setValue("Callback/Port", m_localPortEdit->text());
 
     m_settings->sync();
-
+    emit sigMessage("系统设置: 基础连接配置已保存"); // 【新增】
     QMessageBox::information(this, "系统提示", "基本连接配置已保存");
     emit sigConfigChanged();
 }

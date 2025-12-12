@@ -4,6 +4,7 @@
 #include <QWidget>
 
 class QNetworkAccessManager;
+class QTimer; //
 
 class CPTZControlWidget : public QWidget
 {
@@ -12,7 +13,11 @@ public:
     explicit CPTZControlWidget(QWidget *parent = nullptr);
 
 signals:
-    void sig_CenterClicked();  // 中心按钮点击信号
+    void sig_CenterClicked();  // 中心按钮点击信号（用于翻转）
+
+    // 【新增】通用消息信号，用于向主界面发送操作日志
+    void sigMessage(const QString &msg);
+
 private slots:
     // 9个方向功能槽函数
     void onBtnUpClicked();
@@ -25,7 +30,7 @@ private slots:
     void onBtnDownRightClicked();
     void onBtnCenterClicked();
 
-    // 新增：云台功能槽函数
+    // 云台功能槽函数
     void onBtnZoomInClicked();      // 变倍+
     void onBtnZoomOutClicked();     // 变倍-
     void onBtnFocusNearClicked();   // 聚焦+
@@ -41,7 +46,6 @@ private:
     QNetworkAccessManager *m_networkManager;
     int m_step;
     QTimer *m_stopTimer;
-
 };
 
 #endif // CPTZCONTROLWIDGET_H
