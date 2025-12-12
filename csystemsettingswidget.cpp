@@ -203,11 +203,12 @@ void CSystemSettingsWidget::sendApiRequest(const QMap<QString, QString>& params)
 
     // 5. 发送 POST
     QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+//    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
-    QNetworkReply *reply = m_netManager->post(request, QByteArray()); // Body 为空
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply](){
+//    QNetworkReply *reply = m_netManager->post(request, QByteArray()); // Body 为空
+    // 【修改后】GET 模式 (GET 请求通常不需要设置 Content-Type)
+        QNetworkReply *reply = m_netManager->get(request);
+        connect(reply, &QNetworkReply::finished, this, [this, reply](){
         if(reply->error() == QNetworkReply::NoError) {
             QMessageBox::information(this, "成功", "参数下发成功，设备可能正在重启推流...");
         } else {

@@ -41,8 +41,9 @@ void CPTZControlWidget::sendPtzRequest(const QString &command)
     url.setQuery(QString::fromStdString(queryString));
 
     QNetworkRequest request(url);
-    QNetworkReply *reply = m_networkManager->post(request, QByteArray());
-
+//    QNetworkReply *reply = m_networkManager->post(request, QByteArray());
+    // 【修改后】改为 GET 请求，且不需要手动设置 Content-Type
+        QNetworkReply *reply = m_networkManager->get(request);
     // 简单处理内存泄露
     connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
 }
