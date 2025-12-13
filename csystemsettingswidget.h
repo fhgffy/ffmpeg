@@ -30,6 +30,7 @@ signals:
     void sigConfigChanged();
     // 【新增】消息信号
     void sigMessage(const QString &msg);
+    void sigLogout(); // 【新增】退出登錄信號
 private slots:
     void onSaveClicked();
     // 【新增】保存图像参数
@@ -73,6 +74,7 @@ private:
     QSlider *m_sliderSharpness;     // 锐度
 
     QNetworkAccessManager *m_netManager;
+    QPushButton *m_logoutBtn; // 退出按鈕指針
 };
 
 #endif // CSYSTEMSETTINGSWIDGET_H

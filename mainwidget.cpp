@@ -41,7 +41,8 @@ MainWidget::MainWidget(QWidget *parent)
     connect(m_pTopMenuBar, &CTopMenuBar::sig_FaceRegister, this, &MainWidget::onOpenRegisterDialog);
     connect(m_pTopMenuBar, &CTopMenuBar::sig_LogQuery, this, &MainWidget::onSwitchToLogQuery);
     connect(m_pTopMenuBar, &CTopMenuBar::sig_SystemSettings, this, &MainWidget::onSwitchToSystemSettings);
-
+    // 【新增】連接設置頁面的退出信號 -> 主窗口的退出信號
+    connect(m_pSystemSettingsPage, &CSystemSettingsWidget::sigLogout, this, &MainWidget::sigLogout);
     // 初始化业务组件
     m_server = new NotificationServer(this);
     m_server->startServer(9999);

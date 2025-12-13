@@ -3,20 +3,36 @@
 #include <QApplication>
 #include <QScreen>
 #include <QStyleFactory>
+#include <functional> // 引入 function
 
 int main(int argc, char *argv[])
 {
-    // 移除了 AA_EnableHighDpiScaling，解决比例和点击问题
     QApplication a(argc, argv);
-
-    // 保持 Fusion 样式，让登录界面好看
     a.setStyle(QStyleFactory::create("Fusion"));
 
-    LoginWidget *login = new LoginWidget;
+    // 定義兩個函數指針，用於相互調用
+    std::function<void()> showLogin;
+    std::function<void()> showMain;
 
-    QObject::connect(login, &LoginWidget::sigLoginSuccess, [&](){
+    // 1. 顯示登錄界面的邏輯
+    showLogin = [&]() {
+        LoginWidget *login = new LoginWidget;
+
+        // 當登錄成功時 -> 顯示主界面
+        QObject::connect(login, &LoginWidget::sigLoginSuccess, [&, login](){
+            showMain();          // 進入主界面
+            login->close();      // 關閉登錄窗口
+            login->deleteLater();// 釋放內存
+        });
+
+        login->show();
+    };
+
+    // 2. 顯示主界面的邏輯
+    showMain = [&]() {
         MainWidget *w = new MainWidget;
 
+        // 設置窗口大小和位置 (復用原來的代碼)
         QScreen *screen = QApplication::primaryScreen();
         if (screen) {
             QRect screenGeometry = screen->availableGeometry();
@@ -27,13 +43,20 @@ int main(int argc, char *argv[])
                     (screenGeometry.height() - height) / 2);
         }
 
-        w->show();
-        a.setQuitOnLastWindowClosed(true);
-        login->deleteLater();
-    });
+        // 當點擊退出登錄時 -> 顯示登錄界面
+        QObject::connect(w, &MainWidget::sigLogout, [&, w](){
+            showLogin();     // 回到登錄界面
+            w->close();      // 關閉主界面
+            w->deleteLater();// 釋放內存
+        });
 
-    login->show();
-    a.setQuitOnLastWindowClosed(false);
+        w->show();
+        // 確保關閉主窗口時程序能退出（但切換時不會退出，因為我們馬上開了新窗口）
+        a.setQuitOnLastWindowClosed(true);
+    };
+
+    // 3. 程序啓動，先顯示登錄
+    showLogin();
 
     return a.exec();
 }

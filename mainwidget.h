@@ -42,6 +42,8 @@ class MainWidget : public CFrameLessWidgetBase
 public:
     MainWidget(QWidget *parent = nullptr);
     ~MainWidget();
+signals:
+    void sigLogout(); // 【新增】轉發退出信號給 main.cpp
 
 private slots:
     void getOneFrame(QImage image);

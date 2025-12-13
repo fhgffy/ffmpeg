@@ -163,6 +163,23 @@ void CSystemSettingsWidget::setupUi()
     cbLayout->addRow(new QLabel("监听端口:", this), m_localPortEdit);
     mainLayout->addWidget(callbackGroup);
 
+    // ================== 【新增退出按鈕】 ==================
+        // 放在保存按鈕之前或者之後都可以
+        m_logoutBtn = new QPushButton("退出當前賬號", this);
+        m_logoutBtn->setFixedHeight(40);
+        // 設置紅色樣式以示區別
+        m_logoutBtn->setStyleSheet("QPushButton { background-color: #d9534f; color: white; border-radius: 4px; font-weight: bold; font-size:14px; } "
+                                   "QPushButton:hover { background-color: #c9302c; }");
+
+        connect(m_logoutBtn, &QPushButton::clicked, this, [this](){
+            // 彈窗確認
+            if(QMessageBox::question(this, "確認退出", "確定要退出登錄並返回主界面嗎？") == QMessageBox::Yes) {
+                emit sigLogout(); // 發送退出信號
+            }
+        });
+
+        mainLayout->addWidget(m_logoutBtn);
+        // ====================================================
     // --- 底部保存按钮 (原有) ---
     QPushButton *btnSave = new QPushButton("保存系统配置", this);
     btnSave->setFixedHeight(40);
