@@ -14,8 +14,11 @@
 #include <QDateTime>
 #include "faceregisterdialog.h"
 #include <QNetworkInterface>
-#include <QSplitter> // 【新增】引入 QSplitter 头文件
-
+#include <QSplitter> // 引入 QSplitter 头文件
+#include <QNetworkReply> //
+#include <QJsonDocument> //
+#include <QJsonObject>   //
+#include <QAuthenticator> // 【必须新增】解决 incomplete type 错误
 MainWidget::MainWidget(QWidget *parent)
     : CFrameLessWidgetBase(parent)
     , ui(new Ui::MainWidget)
@@ -49,6 +52,36 @@ MainWidget::MainWidget(QWidget *parent)
 
     m_faceManager = new FaceApiManager(this);
     onConfigCallback();
+
+    // 【新增】初始化网络管理器和定时器用于获取设备信息
+    m_netManager = new QNetworkAccessManager(this);
+
+
+    // 监听认证请求信号
+        connect(m_netManager, &QNetworkAccessManager::authenticationRequired,
+                this, [this](QNetworkReply * /*reply*/, QAuthenticator *authenticator){ // 【修改】reply 参数名注释掉，消除警告
+
+            QString user = "admin";
+            QString pwd = "admin";
+
+            // 如果系统设置里有，就用设置里的
+            if (m_pSystemSettingsPage) {
+                QString cfgUser = m_pSystemSettingsPage->getDeviceUser();
+                QString cfgPwd = m_pSystemSettingsPage->getDevicePwd();
+                if(!cfgUser.isEmpty()) user = cfgUser;
+                if(!cfgPwd.isEmpty()) pwd = cfgPwd;
+            }
+
+            qDebug() << ">>> [网络认证] 正在自动登录... 用户:" << user;
+            authenticator->setUser(user);
+            authenticator->setPassword(pwd);
+        });
+
+
+    m_infoTimer = new QTimer(this);
+    connect(m_infoTimer, &QTimer::timeout, this, &MainWidget::onFetchDeviceInfo);
+    m_infoTimer->start(3000); // 每3秒刷新一次设备信息
+
     onSwitchToMonitor();
 
     // ================= 【日志埋点】 =================
@@ -116,7 +149,7 @@ void MainWidget::initLayout()
     monitorLayout->setContentsMargins(0, 0, 0, 0);
     monitorLayout->setSpacing(0); // 【修改】间距改为0，由Splitter控制
 
-    // 【新增】创建水平分割器
+    // 创建水平分割器
     QSplitter *mainSplitter = new QSplitter(Qt::Horizontal, m_pMonitorPage);
     // 设置分割条样式，使其在深色背景下可见
     mainSplitter->setStyleSheet("QSplitter::handle { background-color: #404040; border: 1px solid #505050; width: 4px; }");
@@ -200,10 +233,10 @@ void MainWidget::initLayout()
 
 void MainWidget::onSwitchToMonitor()
 {
-    // 【关键修改】索引必须是 0 (对应 m_pMonitorPage)
+    // 索引必须是 0 (对应 m_pMonitorPage)
     m_pStackedWidget->setCurrentIndex(0);
 
-    // 【关键修改】回到监控页时，才需要启动播放
+    // 回到监控页时，才需要启动播放
     // 如果您实现了之前的码流切换功能，这里默认传0(主码流)
     startPlayLogic(0);
 
@@ -228,10 +261,10 @@ void MainWidget::onSwitchToLogQuery()
 
 void MainWidget::onSwitchToSystemSettings()
 {
-    // 【关键修改】索引必须是 2 (对应 m_pSystemSettingsPage)
+    // 索引必须是 2 (对应 m_pSystemSettingsPage)
     m_pStackedWidget->setCurrentIndex(2);
 
-    // 【关键修改】进入设置页通常不需要自动播放，甚至可以考虑停止播放以节省资源
+    // 进入设置页通常不需要自动播放，甚至可以考虑停止播放以节省资源
     // startPlayLogic(0);  <-- 这行代码必须删除！
 
     // 记录日志
@@ -242,7 +275,7 @@ void MainWidget::onSwitchToSystemSettings()
 // ---------------------------------------------------------
 // 业务逻辑
 // ---------------------------------------------------------
-// 【修改】实现切换逻辑
+// 实现切换逻辑
 void MainWidget::onStreamSwitchRequest(int channel)
 {
     QString type = (channel == 0) ? "主码流" : "子码流";
@@ -252,7 +285,7 @@ void MainWidget::onStreamSwitchRequest(int channel)
     startPlayLogic(channel);
 }
 
-// 【修改】支持动态 channel 参数
+// 支持动态 channel 参数
 void MainWidget::startPlayLogic(int channel)
 {
     // 1. 获取 IP 配置
@@ -329,20 +362,50 @@ void MainWidget::getOneFrame(QImage image)
 
 bool MainWidget::eventFilter(QObject *watched, QEvent *event)
 {
+    // 只处理视频区域的绘制事件
     if (watched == m_pVideoArea && event->type() == QEvent::Paint) {
         QPainter painter(m_pVideoArea);
+
+        // 1. 获取区域宽高
         int w = m_pVideoArea->width();
         int h = m_pVideoArea->height();
+
+        // 2. 先填充黑色背景
         painter.fillRect(0, 0, w, h, Qt::black);
 
+        // 3. 【核心】绘制视频帧 (如果图片存在)
+        // 您的视频不显示很可能是这一段被误删或写到了 if(!m_osdInfoText.isEmpty()) 里面
         if (!_image.isNull()) {
             QImage img = _image.scaled(QSize(w, h), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            // 处理镜像
             img = img.mirrored(_hFlip, _vFlip);
             int x = (w - img.width()) / 2;
             int y = (h - img.height()) / 2;
             painter.drawImage(x, y, img);
         }
-        return true;
+
+        // 4. 【新增】最后绘制 OSD 文字 (覆盖在视频之上)
+        if(!m_osdInfoText.isEmpty()) {
+            painter.setPen(Qt::white);
+            // 字体设置：微软雅黑，粗体，10号
+            painter.setFont(QFont("Microsoft YaHei", 10, QFont::Bold));
+
+            QFontMetrics fm(painter.font());
+            int textWidth = fm.horizontalAdvance(m_osdInfoText);
+            int textHeight = fm.height();
+
+            // 右下角位置 (留出10px边距)
+            int textX = w - textWidth - 10;
+            int textY = h - 10;
+
+            // 绘制半透明背景 (RGBA: 0,0,0,150)
+            painter.fillRect(textX - 5, textY - textHeight + 2, textWidth + 10, textHeight + 2, QColor(0, 0, 0, 150));
+
+            // 绘制文字
+            painter.drawText(textX, textY, m_osdInfoText);
+        }
+
+        return true; // 拦截事件，不再传递
     }
     return CFrameLessWidgetBase::eventFilter(watched, event);
 }
@@ -442,3 +505,95 @@ void MainWidget::onConfigCallback()
     m_faceManager->setCallback(deviceIp, deviceUser, devicePwd, localIp, localPort);
 }
 
+// 【新增】定时请求设备信息逻辑
+// 【修改前】你的代码可能长这样，导致了 Error
+// QNetworkRequest request(QUrl(urlStr));
+
+// 【修改后】请改为下面这样（分为两行写）：
+void MainWidget::onFetchDeviceInfo()
+{
+    // 1. 获取配置的IP
+    QString ip = "192.168.6.100";
+    if (m_pSystemSettingsPage) {
+        QString cfgIp = m_pSystemSettingsPage->getDeviceIp();
+        if(!cfgIp.isEmpty()) ip = cfgIp;
+    }
+
+    QString urlStr = QString("http://%1/xsw/tmpInfo").arg(ip);
+
+    // 2. 构造带签名的 URL
+    QUrl url(urlStr);
+
+    // >>>>>>>>>> 核心修改：使用 KVQuery 生成 token >>>>>>>>>>
+    KVQuery kv;
+    // 如果接口不需要额外参数，直接调用 toCrpytString 即可
+    // 它会自动加上 t (时间戳) 并计算出 token (MD5签名)
+    QString queryString = QString::fromStdString(kv.toCrpytString());
+
+    // 将生成的 query (如 t=12345&token=xyz...) 设置到 URL 中
+    url.setQuery(queryString);
+    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+    qDebug() << ">>> [设备信息] 发起请求(带Token):" << url.toString();
+
+    // 3. 构造请求
+    QNetworkRequest request(url);
+
+    // 4. 发送请求 (超时处理逻辑保持不变)
+    QNetworkReply *reply = m_netManager->get(request);
+
+    QTimer *timeoutTimer = new QTimer(reply);
+    timeoutTimer->setSingleShot(true);
+    connect(timeoutTimer, &QTimer::timeout, reply, [reply](){
+        reply->abort();
+    });
+    timeoutTimer->start(3000);
+
+    connect(reply, &QNetworkReply::finished, this, &MainWidget::onDeviceInfoReceived);
+}
+// 处理设备信息返回
+void MainWidget::onDeviceInfoReceived()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if(!reply) return;
+
+    // 获取 HTTP 状态码
+    int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    if(reply->error() == QNetworkReply::NoError) {
+        QByteArray data = reply->readAll();
+        // qDebug() << ">>> [设备信息] 原始数据:" << data; // 调试看数据
+
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if(doc.isObject()) {
+            QJsonObject obj = doc.object();
+
+            // 健壮性获取：转为字符串，防止类型不匹配
+            QString totalCountStr = obj.value("totalcount").toVariant().toString();
+            QString cpuStr = obj.value("cpu").toVariant().toString();
+            QString diskFreeStr = obj.value("disk_free").toVariant().toString();
+
+            // 简单的数据格式化
+            double hours = totalCountStr.toDouble() / 3600.0; // 秒转小时
+
+            // 只有当数据有效时才更新，避免显示空的
+            if(!totalCountStr.isEmpty()) {
+                m_osdInfoText = QString("运行: %1h | CPU: %2% | 磁盘: %3MB")
+                                    .arg(QString::number(hours, 'f', 1))
+                                    .arg(cpuStr)
+                                    .arg(diskFreeStr);
+
+                // 强制触发重绘
+                if(m_pVideoArea) m_pVideoArea->update();
+            }
+        }
+    } else {
+        // 如果状态码是 401，说明认证还是失败了
+        if (statusCode == 401) {
+            qDebug() << ">>> [设备信息] 认证失败，请检查用户名密码";
+        } else {
+            qDebug() << ">>> [设备信息] 请求错误:" << reply->errorString() << "状态码:" << statusCode;
+        }
+    }
+    reply->deleteLater();
+}

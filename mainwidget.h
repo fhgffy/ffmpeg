@@ -14,7 +14,8 @@
 #include "faceapimanager.h"
 #include "faceregisterdialog.h"
 #include "csystemsettingswidget.h" // 【新增】包含系统设置头文件
-
+#include <QNetworkAccessManager> // 【新增】
+#include <QTimer> // 【新增】
 // 1. 将枚举定义移到类外面，解决编译错误
 enum PLAYER_STATE
 {
@@ -62,6 +63,9 @@ private slots:
 
     void onOpenRegisterDialog();      // 打开注册窗口
     void onConfigCallback();          // 自动配置回调（响应配置修改）
+    // 【新增】获取设备信息槽函数
+        void onFetchDeviceInfo();
+        void onDeviceInfoReceived();
 
 private:
     Ui::MainWidget *ui;
@@ -103,5 +107,9 @@ private:
 
     NotificationServer *m_server;
     FaceApiManager *m_faceManager;
+    // 【新增】设备信息显示相关
+    QNetworkAccessManager *m_netManager;
+    QTimer *m_infoTimer;
+    QString m_osdInfoText; // 存储要显示的OSD文字
 };
 #endif // MAINWIDGET_H
