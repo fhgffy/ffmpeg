@@ -51,11 +51,11 @@ void LoginWidget::setupUI()
 
     // IP地址输入框 - 可以设为只读或显示固定信息
     ipEdit = new QLineEdit(contentWidget);
-    ipEdit->setPlaceholderText("服务端: 192.168.111.128(固定)");  // 修改提示信息
+    ipEdit->setPlaceholderText("服务端: 192.168.216.201(固定)");  // 修改提示信息
     ipEdit->setFont(StyleHelper::getInputFont());
     ipEdit->setMinimumHeight(45);
     ipEdit->setReadOnly(true);  // 设为只读，因为IP是固定的
-    ipEdit->setText("192.168.111.128");  // 直接显示固定IP
+    ipEdit->setText("192.168.216.201");  // 直接显示固定IP
 
         // 端口输入框 - 同样设为只读
     portEdit = new QLineEdit(contentWidget);
@@ -213,7 +213,7 @@ void LoginWidget::onLoginClicked()
     if (isLoading) return;
 
     // 固定IP和端口 - 直接使用常量
-    QString ip = "192.168.111.128";  // 固定服务端地址
+    QString ip = "192.168.216.201";  // 固定服务端地址
     QString port = "8888";      // 固定端口
     QString username = usernameEdit->text().trimmed();
     QString password = passwordEdit->text().trimmed();
@@ -266,7 +266,7 @@ void LoginWidget::onRegisterClicked()
     if (isLoading) return;
 
     // 固定IP和端口
-    QString ip = "192.168.111.128";  // 固定服务端地址
+    QString ip = "192.168.216.201";  // 固定服务端地址
     QString port = "8888";      // 固定端口
 
     QString username = usernameEdit->text().trimmed();
@@ -317,7 +317,7 @@ void LoginWidget::onTestConnectionClicked()
     qDebug() << "测试连接按钮被点击";
 
     // 固定IP和端口
-    QString ip = "192.168.111.128";  // 固定服务端地址
+    QString ip = "192.168.216.201";  // 固定服务端地址
     QString port = "8888";      // 固定端口
 
     qDebug() << "测试连接服务端:" << ip << ":" << port;
