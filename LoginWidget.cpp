@@ -1,22 +1,43 @@
-﻿#include "LoginWidget.h"
+﻿
+
+#include "LoginWidget.h"
 #include "StyleHelper.h"
-
-
-#include <QMessageBox>
-#include <QIntValidator>
-#include <QRegularExpressionValidator>
-#include <QApplication>
-#include <QDesktopWidget>
-#include <QGraphicsDropShadowEffect>
-#include <QDebug>
 #include <QTimer>
-
+#include <QDebug>
+#include <QGraphicsDropShadowEffect>
+#include <QSettings> // 引入设置
+#include <QDialog>
+#include <QSpinBox>
+#include <QFormLayout>
+#include <QDialogButtonBox>
 LoginWidget::LoginWidget(QWidget *parent)
-    : QWidget(parent), networkManager(new NetworkManager(this)), isLoading(false)
+    : CFrameLessWidgetBase(parent)
+    , networkManager(new NetworkManager(this))
+    , isLoading(false)
+    , m_autoLoginCount(0) // 初始化
 {
+    // 初始化自動登錄定時器
+        m_autoLoginTimer = new QTimer(this);
+        // 【注意】這裡去掉了 setSingleShot(true)，因爲我們要它每秒跳一次
+
+        // 【核心邏輯修改】每秒執行一次
+        connect(m_autoLoginTimer, &QTimer::timeout, this, [this](){
+            m_autoLoginCount--; // 倒計時減一
+
+            if (m_autoLoginCount > 0) {
+                // 還沒到時間，更新按鈕文字
+                loginButton->setText(QString("自動登錄中...(%1秒)").arg(m_autoLoginCount));
+            } else {
+                // 時間到，停止定時器並登錄
+                m_autoLoginTimer->stop();
+                onLoginClicked();
+            }
+        });
     setupUI();
     setupConnections();
-    setFixedSize(400, 500);
+    resize(430, 580);
+    // 【新增】程序啓動時加載保存的設置
+        loadSavedSettings();
 }
 
 LoginWidget::~LoginWidget()
@@ -25,236 +46,198 @@ LoginWidget::~LoginWidget()
 
 void LoginWidget::setupUI()
 {
-    // 设置主布局
-    loginLayout = new QVBoxLayout(this);
-    loginLayout->setSpacing(0);  // 设置为0，让标题栏紧贴窗口边缘
-    loginLayout->setContentsMargins(0, 0, 0, 0);  // 去掉所有边距
+    this->setStyleSheet("LoginWidget { background-color: #2b2b2b; border: 1px solid #454545; border-radius: 5px; }");
 
-    // 创建内容部件，用于放置除标题栏外的所有内容
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
+
+    m_titleBar = new CTitleBar(this);
+    m_titleBar->setStyleSheet("background-color: transparent;");
+    connect(m_titleBar, &CTitleBar::sigClose, this, &LoginWidget::close);
+    mainLayout->addWidget(m_titleBar);
+
     QWidget *contentWidget = new QWidget(this);
+    contentWidget->setStyleSheet("background-color: transparent;");
     QVBoxLayout *contentLayout = new QVBoxLayout(contentWidget);
-    contentLayout->setSpacing(10);
-    contentLayout->setContentsMargins(40, 20, 40, 40);  // 设置内容边距
+    contentLayout->setContentsMargins(40, 10, 40, 40);
+    contentLayout->setSpacing(20);
 
-    // 标题
-    titleLabel = new QLabel("监控系统登录", contentWidget);
-    titleLabel->setFont(StyleHelper::getTitleFont());
-    titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("color: #4299E1;"
-                              "font-size: 36px;"
-                              "font-weight: bold;");
+    m_logoLabel = new QLabel(contentWidget);
+    m_logoLabel->setFixedSize(100, 100);
+    QPixmap logoPix(":/logo/logo.png");
+    m_logoLabel->setPixmap(logoPix);
+    m_logoLabel->setScaledContents(true);
+    m_logoLabel->setAlignment(Qt::AlignCenter);
 
-    // 表单布局
-    formLayout = new QFormLayout();
-    formLayout->setSpacing(15);
-    formLayout->setLabelAlignment(Qt::AlignRight);
+    m_welcomeLabel = new QLabel("欢迎登录监控系统", contentWidget);
+    m_welcomeLabel->setStyleSheet("color: #ffffff; font-size: 24px; font-weight: bold; font-family: 'Microsoft YaHei';");
+    m_welcomeLabel->setAlignment(Qt::AlignCenter);
 
-    // IP地址输入框 - 可以设为只读或显示固定信息
-    ipEdit = new QLineEdit(contentWidget);
-    ipEdit->setPlaceholderText("服务端: 192.168.216.201(固定)");  // 修改提示信息
-    ipEdit->setFont(StyleHelper::getInputFont());
-    ipEdit->setMinimumHeight(45);
-    ipEdit->setReadOnly(true);  // 设为只读，因为IP是固定的
-    ipEdit->setText("192.168.216.201");  // 直接显示固定IP
+    QHBoxLayout *logoLayout = new QHBoxLayout();
+    logoLayout->addStretch();
+    logoLayout->addWidget(m_logoLabel);
+    logoLayout->addStretch();
+    contentLayout->addLayout(logoLayout);
+    contentLayout->addWidget(m_welcomeLabel);
+    contentLayout->addSpacing(10);
 
-        // 端口输入框 - 同样设为只读
-    portEdit = new QLineEdit(contentWidget);
-    portEdit->setPlaceholderText("端口: 8888 (固定)");  // 修改提示信息
-    portEdit->setFont(StyleHelper::getInputFont());
-    portEdit->setMinimumHeight(45);
-    portEdit->setReadOnly(true);  // 设为只读
-    portEdit->setText("8888");    // 直接显示固定端口
+    QString inputStyle = R"(
+        QLineEdit {
+            background-color: #3e3e3e;
+            border: 1px solid #505050;
+            border-radius: 4px;
+            color: #ffffff;
+            padding: 10px 10px;
+            font-size: 14px;
+            selection-background-color: #0078d7;
+        }
+        QLineEdit:focus {
+            border: 1px solid #0078d7;
+            background-color: #454545;
+        }
+        QLineEdit:disabled {
+            background-color: #333333;
+            color: #888888;
+        }
+    )";
 
-    // 用户名输入框
     usernameEdit = new QLineEdit(contentWidget);
     usernameEdit->setPlaceholderText("请输入用户名");
-    usernameEdit->setFont(StyleHelper::getInputFont());
+    usernameEdit->setStyleSheet(inputStyle);
     usernameEdit->setMinimumHeight(45);
 
-    // 密码输入框
     passwordEdit = new QLineEdit(contentWidget);
     passwordEdit->setPlaceholderText("请输入密码");
-    passwordEdit->setFont(StyleHelper::getInputFont());
-    passwordEdit->setMinimumHeight(45);
     passwordEdit->setEchoMode(QLineEdit::Password);
+    passwordEdit->setStyleSheet(inputStyle);
+    passwordEdit->setMinimumHeight(45);
 
-    // 创建标签
-    QLabel *ipLabel = new QLabel("IP地址:", contentWidget);
-    QLabel *portLabel = new QLabel("端口:", contentWidget);
-    QLabel *userLabel = new QLabel("用户名:", contentWidget);
-    QLabel *passLabel = new QLabel("密码:", contentWidget);
+    contentLayout->addWidget(usernameEdit);
+    contentLayout->addWidget(passwordEdit);
 
-    QVector<QLabel*> labels = {ipLabel, portLabel, userLabel, passLabel};
-    for (auto label : labels) {
-        label->setFont(StyleHelper::getLabelFont());
-        label->setMinimumWidth(60);
-    }
+    QHBoxLayout *optionsLayout = new QHBoxLayout();
+    QString checkStyle = "QCheckBox { color: #cccccc; font-size: 12px; } "
+                         "QCheckBox::indicator { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #666; background: #333; }"
+                         "QCheckBox::indicator:checked { background-color: #0078d7; border-color: #0078d7; image: url(:/resources/titlebar/normal.svg); }";
 
-    // 添加到表单
-    formLayout->addRow(ipLabel, ipEdit);
-    formLayout->addRow(portLabel, portEdit);
-    formLayout->addRow(userLabel, usernameEdit);
-    formLayout->addRow(passLabel, passwordEdit);
-
-    // 选项布局
-    optionsLayout = new QHBoxLayout();
     rememberMeCheck = new QCheckBox("记住密码", contentWidget);
-    autoLoginCheck = new QCheckBox("自动登录", contentWidget);
+    rememberMeCheck->setStyleSheet(checkStyle);
 
-    rememberMeCheck->setFont(StyleHelper::getLabelFont());
-    autoLoginCheck->setFont(StyleHelper::getLabelFont());
+    autoLoginCheck = new QCheckBox("自动登录", contentWidget);
+    autoLoginCheck->setStyleSheet(checkStyle);
 
     optionsLayout->addWidget(rememberMeCheck);
     optionsLayout->addStretch();
     optionsLayout->addWidget(autoLoginCheck);
-
-    // 按钮布局
-    buttonLayout = new QHBoxLayout();
-    buttonLayout->setSpacing(15);
-
-    // 测试连接按钮
-    testConnectionButton = new QPushButton("测试连接", contentWidget);
-    testConnectionButton->setFont(StyleHelper::getButtonFont());
-
-    // 注册按钮
-    registerButton = new QPushButton("注册", contentWidget);
-    registerButton->setFont(StyleHelper::getButtonFont());
-
-    // 登录按钮
-    loginButton = new QPushButton("登录", contentWidget);
-    loginButton->setFont(StyleHelper::getButtonFont());
-    loginButton->setDefault(true);
-
-    buttonLayout->addWidget(testConnectionButton);
-    buttonLayout->addStretch();
-    buttonLayout->addWidget(registerButton);
-    buttonLayout->addWidget(loginButton);
-
-    // 状态标签
-    statusLabel = new QLabel(contentWidget);
-    statusLabel->setAlignment(Qt::AlignCenter);
-    statusLabel->setFont(StyleHelper::getLabelFont());
-    statusLabel->setWordWrap(true);
-    statusLabel->setMinimumHeight(40);
-
-    // 将内容添加到内容布局
-    contentLayout->addWidget(titleLabel);
-    contentLayout->addLayout(formLayout);
     contentLayout->addLayout(optionsLayout);
-    contentLayout->addWidget(createLine());
-    contentLayout->addLayout(buttonLayout);
+
+    contentLayout->addSpacing(10);
+
+    QString loginBtnStyle = R"(
+        QPushButton {
+            background-color: #0078d7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 12px;
+        }
+        QPushButton:hover { background-color: #198ae0; }
+        QPushButton:pressed { background-color: #0063b1; }
+        QPushButton:disabled { background-color: #444444; color: #888888; }
+    )";
+
+    QString regBtnStyle = R"(
+        QPushButton {
+            background-color: transparent;
+            color: #0078d7;
+            border: 1px solid #0078d7;
+            border-radius: 4px;
+            font-size: 14px;
+            padding: 10px;
+        }
+        QPushButton:hover { background-color: rgba(0, 120, 215, 0.1); }
+        QPushButton:pressed { background-color: rgba(0, 120, 215, 0.2); }
+        QPushButton:disabled { border-color: #555; color: #555; }
+    )";
+
+    loginButton = new QPushButton("登  录", contentWidget);
+    loginButton->setStyleSheet(loginBtnStyle);
+    loginButton->setCursor(Qt::PointingHandCursor);
+
+    registerButton = new QPushButton("注册账号", contentWidget);
+    registerButton->setStyleSheet(regBtnStyle);
+    registerButton->setCursor(Qt::PointingHandCursor);
+
+    contentLayout->addWidget(loginButton);
+    contentLayout->addWidget(registerButton);
+
+    statusLabel = new QLabel("", contentWidget);
+    statusLabel->setAlignment(Qt::AlignCenter);
+    statusLabel->setStyleSheet("color: #ff4d4f; font-size: 12px; min-height: 20px;");
     contentLayout->addWidget(statusLabel);
 
-    // 将内容部件添加到主布局
-    loginLayout->addWidget(contentWidget);
-
-    // 设置内容部件的样式
-    contentWidget->setStyleSheet(StyleHelper::getAppStyleSheet());
-
-    // 设置窗口样式
-    setStyleSheet(StyleHelper::getAppStyleSheet());
-
-
-}
-
-QFrame* LoginWidget::createLine()
-{
-    QFrame *line = new QFrame(this);
-    line->setFrameShape(QFrame::HLine);
-    line->setStyleSheet("background-color: rgba(255, 255, 255, 0.2); height: 1px;");
-    return line;
+    mainLayout->addWidget(contentWidget);
+    usernameEdit->setFocus();
 }
 
 void LoginWidget::setupConnections()
 {
-    // 按钮点击信号
     connect(loginButton, &QPushButton::clicked, this, &LoginWidget::onLoginClicked);
     connect(registerButton, &QPushButton::clicked, this, &LoginWidget::onRegisterClicked);
-    connect(testConnectionButton, &QPushButton::clicked, this, &LoginWidget::onTestConnectionClicked);
+    connect(usernameEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
+    connect(passwordEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
 
-    // 复选框信号
-    connect(rememberMeCheck, &QCheckBox::toggled, this, &LoginWidget::onRememberMeToggled);
-    connect(autoLoginCheck, &QCheckBox::toggled, this, &LoginWidget::onAutoLoginToggled);
-
-    // 网络管理器信号 - 使用lambda表达式接收信号
-    // 注意：这里不再直接连接信号到onLoginResult等函数
-    // 而是通过lambda表达式调用它们
     connect(networkManager, &NetworkManager::loginSuccess, this, [this]() {
-        onLoginResult(true, "登录成功！");
+        onLoginResult(true, "登录成功，正在跳转...");
     });
-
     connect(networkManager, &NetworkManager::loginFailed, this, [this](const QString &error) {
         onLoginResult(false, error);
     });
-
     connect(networkManager, &NetworkManager::registrationSuccess, this, [this]() {
-        onRegisterResult(true, "注册成功！");
+        onRegisterResult(true, "注册成功，请直接登录");
     });
-
     connect(networkManager, &NetworkManager::registrationFailed, this, [this](const QString &error) {
         onRegisterResult(false, error);
     });
-
-    connect(networkManager, &NetworkManager::connectionTested, this, [this](bool success, const QString &message) {
-        onConnectionTestResult(success, message);
-    });
-
-    // 输入框回车键触发登录
-    connect(ipEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
-    connect(portEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
-    connect(usernameEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
-    connect(passwordEdit, &QLineEdit::returnPressed, this, &LoginWidget::onLoginClicked);
+    // 【新增】连接标题栏的设置信号
+    connect(m_titleBar, &CTitleBar::sigSet, this, &LoginWidget::onShowSettingDialog);
+    // 連接複選框的槽函數，處理邏輯聯動
+    connect(rememberMeCheck, &QCheckBox::toggled, this, &LoginWidget::onRememberMeToggled);
+    connect(autoLoginCheck, &QCheckBox::toggled, this, &LoginWidget::onAutoLoginToggled);
 }
 
-// 修改验证逻辑，因为IP和端口固定了，只需要验证用户名和密码
 void LoginWidget::onLoginClicked()
 {
-    qDebug() << "登录按钮被点击";
     if (isLoading) return;
+    statusLabel->clear();
 
-    // 固定IP和端口 - 直接使用常量
-    QString ip = "192.168.216.201";  // 固定服务端地址
-    QString port = "8888";      // 固定端口
+    QSettings settings("config.ini", QSettings::IniFormat);
+    // 读出来的 port 已经是 int
+    QString ip = settings.value("Server/IP", "192.168.216.201").toString();
+    int port = settings.value("Server/Port", 8888).toInt();
+
     QString username = usernameEdit->text().trimmed();
     QString password = passwordEdit->text().trimmed();
 
-    // 只验证用户名和密码（IP和端口固定）
     if (username.isEmpty() || password.isEmpty()) {
-        showMessage("用户名和密码不能为空", true);
+        showMessage("用户名或密码不能为空", true);
         return;
     }
-
-    if (!Validators::isValidUsername(username)) {
-        showMessage("用户名必须是4-20位字母数字", true);
-        return;
-    }
-
-    if (!Validators::isValidPassword(password)) {
-        showMessage("密码必须是6-20位，且包含字母和数字", true);
-        return;
-    }
-
-    qDebug() << "连接服务端:" << ip << ":" << port;
 
     setLoading(true);
-    showMessage("正在连接服务端...", false);
+    showMessage("正在连接服务器...", false);
 
-    // 发送登录请求信号（传递固定服务端IP和端口）
-    emit loginRequested(ip, port.toInt(), username, password);
-
-    // 使用实际的网络请求（连接到服务端）
-    networkManager->login(ip, port.toInt(), username, password,
+    // 【修正】去掉 .toInt()，直接传递 int 类型的 port
+    emit loginRequested(ip, port, username, password);
+    networkManager->login(ip, port, username, password,
                          [this](bool success, const QString &message) {
-        // 确保在主线程执行UI更新
         QMetaObject::invokeMethod(this, [this, success, message]() {
-            setLoading(false);
-            if (success) {
-                showMessage("登录成功！", false);
-                loginButton->setStyleSheet(
-                    "background-color: #38A169; color: white; border: none; border-radius: 8px; padding: 14px;");
-                // 这里可以添加登录成功后的跳转逻辑
-            } else {
-                showMessage("登录失败: " + message, true);
+            if (!success) {
+                setLoading(false);
+                showMessage(message, true);
             }
         });
     });
@@ -262,159 +245,243 @@ void LoginWidget::onLoginClicked()
 
 void LoginWidget::onRegisterClicked()
 {
-    qDebug() << "注册按钮被点击";
     if (isLoading) return;
+    statusLabel->clear();
 
-    // 固定IP和端口
-    QString ip = "192.168.216.201";  // 固定服务端地址
-    QString port = "8888";      // 固定端口
+    QSettings settings("config.ini", QSettings::IniFormat);
+    QString ip = settings.value("Server/IP", "192.168.216.201").toString();
+    int port = settings.value("Server/Port", 8888).toInt();
 
     QString username = usernameEdit->text().trimmed();
     QString password = passwordEdit->text().trimmed();
 
-    // 只验证用户名和密码
     if (username.isEmpty() || password.isEmpty()) {
-        showMessage("用户名和密码不能为空", true);
-        return;
-    }
-
-    if (!Validators::isValidUsername(username)) {
-        showMessage("用户名必须是4-20位字母数字", true);
-        return;
-    }
-
-    if (!Validators::isValidPassword(password)) {
-        showMessage("密码必须是6-20位，且包含字母和数字", true);
+        showMessage("请填写用户名和密码", true);
         return;
     }
 
     setLoading(true);
-    showMessage("正在连接服务端...", false);
+    showMessage("正在注册...", false);
 
-    // 发送注册请求信号
-    emit registerRequested(ip, port.toInt(), username, password);
-
-    // 使用实际的网络请求（连接到服务端）
-    networkManager->registerUser(ip, port.toInt(), username, password,
+    // 【修正】去掉 .toInt()，直接传递 int 类型的 port
+    emit registerRequested(ip, port, username, password);
+    networkManager->registerUser(ip, port, username, password,
                                 [this](bool success, const QString &message) {
-        // 确保在主线程执行UI更新
         QMetaObject::invokeMethod(this, [this, success, message]() {
-            setLoading(false);
-            if (success) {
-                showMessage("注册成功！", false);
-                registerButton->setStyleSheet(
-                    "background-color: #38A169; color: white; border: none; border-radius: 8px; padding: 14px;");
-                // 注册成功后可以自动切换到登录状态
-            } else {
-                showMessage("注册失败: " + message, true);
+             if (!success) {
+                setLoading(false);
+                showMessage(message, true);
             }
         });
     });
 }
 
-void LoginWidget::onTestConnectionClicked()
-{
-    qDebug() << "测试连接按钮被点击";
-
-    // 固定IP和端口
-    QString ip = "192.168.216.201";  // 固定服务端地址
-    QString port = "8888";      // 固定端口
-
-    qDebug() << "测试连接服务端:" << ip << ":" << port;
-
-    setLoading(true);
-    showMessage("正在测试服务端连接...", false);
-
-    // 发送测试连接信号
-    emit connectionTestRequested(ip, port.toInt());
-
-    // 使用实际的网络请求（测试服务端连接）
-    networkManager->testConnection(ip, port.toInt(),
-                                  [this](bool success, const QString &message) {
-        setLoading(false);
-        onConnectionTestResult(success, message);
-    });
-}
-
-// 这些函数现在是私有成员函数，不是槽函数
 void LoginWidget::onLoginResult(bool success, const QString &message)
 {
-    qDebug() << "登录结果:" << success << message;
-    showMessage(message, !success);
     if (success) {
-        loginButton->setStyleSheet(
-            "background-color: #38A169; color: white; border: none; border-radius: 8px; padding: 14px;");
+        showMessage(message, false);
+        loginButton->setText("登录成功");
+        loginButton->setStyleSheet("QPushButton { background-color: #28a745; color: white; border-radius: 4px; font-weight: bold; padding: 12px; border: none;}");
+        // 【新增】登錄成功，保存賬號密碼和狀態
+        saveLoginSettings();
+        QTimer::singleShot(500, this, [this](){
+            emit sigLoginSuccess();
+            this->close();
+        });
+    } else {
+        setLoading(false);
+        showMessage(message, true);
+        // 登录失败，取消自动登录
+        if (autoLoginCheck->isChecked()) {
+                // 这会触发 onAutoLoginToggled(false)，从而停止定时器并恢复按钮文字
+                autoLoginCheck->setChecked(false);
+                statusLabel->setText("自动登录失败，已取消自动登录");
+        }
     }
-    // 延时500毫秒，让用户看到“登录成功”的提示后再跳转
-            QTimer::singleShot(500, this, [this](){
-                emit sigLoginSuccess(); // 发送信号通知 main.cpp
-                this->close();          // 关闭登录窗口
-            });
 }
 
 void LoginWidget::onRegisterResult(bool success, const QString &message)
 {
-    qDebug() << "注册结果:" << success << message;
-    showMessage(message, !success);
+    setLoading(false);
     if (success) {
-        registerButton->setStyleSheet(
-            "background-color: #38A169; color: white; border: none; border-radius: 8px; padding: 14px;");
+        showMessage(message, false);
+        passwordEdit->setFocus();
+    } else {
+        showMessage(message, true);
     }
-}
-
-void LoginWidget::onConnectionTestResult(bool success, const QString &message)
-{
-    qDebug() << "连接测试结果:" << success << message;
-    showMessage(message, !success);
-    if (success) {
-        testConnectionButton->setStyleSheet(
-            "background-color: #38A169; color: white; border: none; border-radius: 8px; padding: 14px;");
-    }
-}
-
-void LoginWidget::onRememberMeToggled(bool checked)
-{
-    qDebug() << "记住密码:" << checked;
-    Q_UNUSED(checked);
-}
-
-void LoginWidget::onAutoLoginToggled(bool checked)
-{
-    qDebug() << "自动登录:" << checked;
-    Q_UNUSED(checked);
 }
 
 void LoginWidget::showMessage(const QString &message, bool isError)
 {
     statusLabel->setText(message);
     if (isError) {
-        statusLabel->setStyleSheet("color: #FC8181;");
+        statusLabel->setStyleSheet("color: #ff4d4f; font-size: 13px;");
     } else {
-        statusLabel->setStyleSheet("color: #68D391;");
+        statusLabel->setStyleSheet("color: #28a745; font-size: 13px;");
     }
 }
 
 void LoginWidget::setLoading(bool loading)
 {
     isLoading = loading;
-
-    ipEdit->setEnabled(!loading);
-    portEdit->setEnabled(!loading);
     usernameEdit->setEnabled(!loading);
     passwordEdit->setEnabled(!loading);
     loginButton->setEnabled(!loading);
     registerButton->setEnabled(!loading);
-    testConnectionButton->setEnabled(!loading);
-    rememberMeCheck->setEnabled(!loading);
-    autoLoginCheck->setEnabled(!loading);
 
     if (loading) {
-        loginButton->setText("登录中...");
-        registerButton->setText("注册中...");
-        testConnectionButton->setText("测试中...");
+        loginButton->setText("请稍候...");
+        this->setCursor(Qt::WaitCursor);
     } else {
-        loginButton->setText("登录");
-        registerButton->setText("注册");
-        testConnectionButton->setText("测试连接");
+        loginButton->setText("登  录");
+        this->setCursor(Qt::ArrowCursor);
     }
+}
+
+// 實現複選框聯動邏輯
+void LoginWidget::onRememberMeToggled(bool checked)
+{
+    // 如果取消了「記住密碼」，則必須取消「自動登錄」
+    if (!checked) {
+        autoLoginCheck->setChecked(false);
+    }
+}
+// 自動登錄勾選邏輯
+void LoginWidget::onAutoLoginToggled(bool checked)
+{
+    if (checked) {
+        // 勾选自动登录 -> 必须勾选记住密码
+        rememberMeCheck->setChecked(true);
+
+        // 【新增逻辑】只要勾选，且有账号密码，就启动 5 秒倒计时
+        if (!usernameEdit->text().isEmpty() && !passwordEdit->text().isEmpty()) {
+            // 如果定时器已经在跑（比如程序刚启动），就不重置了；
+            // 如果是用户手动重新勾选（定时器已停），则重新开始。
+            if (!m_autoLoginTimer->isActive()) {
+                m_autoLoginCount = 5;
+                loginButton->setText(QString("自动登录中...(%1秒)").arg(m_autoLoginCount));
+                m_autoLoginTimer->start(1000);
+            }
+        }
+    } else {
+        // 取消勾选 -> 立即停止倒计时
+        if (m_autoLoginTimer->isActive()) {
+            m_autoLoginTimer->stop();
+            loginButton->setText("登  录"); // 恢复按钮文字
+        }
+    }
+}
+
+// 2. 实现弹窗逻辑
+void LoginWidget::onShowSettingDialog()
+{
+    // 创建一个简单的模态对话框
+    QDialog dlg(this);
+    dlg.setWindowTitle("服务器配置");
+    dlg.setFixedSize(300, 150);
+    dlg.setStyleSheet("QDialog { background-color: #3e3e3e; color: white; } "
+                      "QLabel { color: white; } "
+                      "QLineEdit, QSpinBox { background-color: #2b2b2b; color: white; border: 1px solid #505050; padding: 4px; }");
+
+    QFormLayout *layout = new QFormLayout(&dlg);
+
+    // 读取当前配置
+    QSettings settings("config.ini", QSettings::IniFormat);
+    QString currentIp = settings.value("Server/IP", "192.168.216.201").toString();
+    int currentPort = settings.value("Server/Port", 8888).toInt();
+
+    // IP 输入框
+    QLineEdit *ipEdit = new QLineEdit(&dlg);
+    ipEdit->setText(currentIp);
+
+    // 端口输入框
+    QSpinBox *portSpin = new QSpinBox(&dlg);
+    portSpin->setRange(1, 65535);
+    portSpin->setValue(currentPort);
+    portSpin->setButtonSymbols(QAbstractSpinBox::NoButtons); // 不显示上下箭头
+
+    layout->addRow("服务器 IP:", ipEdit);
+    layout->addRow("服务器端口:", portSpin);
+
+    // 确认取消按钮
+    QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    btnBox->setStyleSheet("QPushButton { background-color: #0078d7; color: white; border: none; padding: 6px 12px; border-radius: 4px; } "
+                          "QPushButton:hover { background-color: #198ae0; }");
+    layout->addWidget(btnBox);
+
+    connect(btnBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btnBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    // 显示弹窗
+    if (dlg.exec() == QDialog::Accepted) {
+        // 保存配置
+        settings.setValue("Server/IP", ipEdit->text().trimmed());
+        settings.setValue("Server/Port", portSpin->value());
+        settings.sync(); // 强制写入
+
+        // 可选：提示用户
+        statusLabel->setText("配置已更新，下次登录生效");
+    }
+}
+
+void LoginWidget::loadSavedSettings()
+{
+    QSettings settings("config.ini", QSettings::IniFormat);
+
+    bool remember = settings.value("Login/RememberMe", false).toBool();
+    bool autoLogin = settings.value("Login/AutoLogin", false).toBool();
+
+    // 【修改点1】先不要setChecked，先填数据
+    // rememberMeCheck->setChecked(remember);
+    // autoLoginCheck->setChecked(autoLogin);
+
+    if (remember) {
+        usernameEdit->setText(settings.value("Login/Username").toString());
+        QByteArray passData = settings.value("Login/Password").toByteArray();
+        passwordEdit->setText(QByteArray::fromBase64(passData));
+    }
+
+    // 【修改点2】数据填好后，最后再设置勾选状态
+    // setChecked 会触发 onRememberMeToggled 和 onAutoLoginToggled 信号
+    // 从而自动触发我们在 onAutoLoginToggled 里写的倒计时逻辑
+    rememberMeCheck->setChecked(remember);
+
+    // 这里为了防止逻辑冲突（比如先setChecked(true)触发了倒计时，但可能还没准备好），
+    // 建议加个判断：只有当 autoLogin 为 true 时才去 setChecked
+    if (autoLogin) {
+        autoLoginCheck->setChecked(true);
+    }
+}
+
+// saveLoginSettings 函數
+void LoginWidget::saveLoginSettings()
+{
+    QSettings settings("config.ini", QSettings::IniFormat);
+
+    bool remember = rememberMeCheck->isChecked();
+    bool autoLogin = autoLoginCheck->isChecked();
+
+    settings.setValue("Login/RememberMe", remember);
+    settings.setValue("Login/AutoLogin", autoLogin);
+
+    if (remember) {
+        settings.setValue("Login/Username", usernameEdit->text());
+        settings.setValue("Login/Password", passwordEdit->text().toUtf8().toBase64());
+    } else {
+        settings.remove("Login/Username");
+        settings.remove("Login/Password");
+    }
+    settings.sync();
+}
+
+// 【新增】實現關閉事件
+void LoginWidget::closeEvent(QCloseEvent *event)
+{
+    // 無論是否登錄成功，只要記住密碼被勾選，關閉窗口時都保存當前輸入的內容
+    if (rememberMeCheck->isChecked()) {
+        saveLoginSettings();
+    }
+
+    // 調用父類處理（確保窗口正常關閉）
+    CFrameLessWidgetBase::closeEvent(event);
 }

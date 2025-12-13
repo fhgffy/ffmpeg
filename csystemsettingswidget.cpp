@@ -44,6 +44,26 @@ void CSystemSettingsWidget::setupUi()
     QString labelStyle = "QLabel { color: #cccccc; font-weight: normal; }";
     QString editStyle = "QLineEdit, QComboBox, QSpinBox { background-color: #3e3e3e; color: white; border: 1px solid #505050; padding: 4px; border-radius: 3px; }";
 
+    // ================== 【新增部分開始】 ==================
+        // 0. 監控後台服務器配置 (最重要，放在最上面或者設備配置旁邊)
+        QGroupBox *serverGroup = new QGroupBox("監控後台服務器配置 (登錄驗證用)", this);
+        serverGroup->setStyleSheet(groupStyle);
+        QFormLayout *serverLayout = new QFormLayout(serverGroup);
+        serverLayout->setLabelAlignment(Qt::AlignRight);
+
+        m_serverIpEdit = new QLineEdit(this);
+        m_serverIpEdit->setStyleSheet(editStyle);
+
+        m_serverPortEdit = new QLineEdit(this);
+        m_serverPortEdit->setStyleSheet(editStyle);
+        m_serverPortEdit->setValidator(new QIntValidator(1, 65535, this));
+
+        serverLayout->addRow(new QLabel("服務器IP:", this), m_serverIpEdit);
+        serverLayout->addRow(new QLabel("服務器端口:", this), m_serverPortEdit);
+
+        mainLayout->addWidget(serverGroup);
+        // ================== 【新增部分結束】 ==================
+
     // --- 1. 设备连接配置 ---
     QGroupBox *deviceGroup = new QGroupBox("摄像头连接配置", this);
     deviceGroup->setStyleSheet(groupStyle);
@@ -232,6 +252,12 @@ void CSystemSettingsWidget::initLocalIps()
 
 void CSystemSettingsWidget::loadSettings()
 {
+    // ================== 【新增讀取邏輯】 ==================
+        // 讀取服務器配置，默認值設為你之前的 192.168.216.201 和 8888
+        m_serverIpEdit->setText(m_settings->value("Server/IP", "192.168.216.201").toString());
+        m_serverPortEdit->setText(m_settings->value("Server/Port", "8888").toString());
+        // ====================================================
+
     // 读取配置
     m_deviceIpEdit->setText(m_settings->value("Device/IP", "192.168.6.100").toString());
     m_deviceUserEdit->setText(m_settings->value("Device/User", "admin").toString());
@@ -246,6 +272,10 @@ void CSystemSettingsWidget::loadSettings()
 
 void CSystemSettingsWidget::onSaveClicked()
 {
+    // ================== 【新增保存邏輯】 ==================
+    m_settings->setValue("Server/IP", m_serverIpEdit->text());
+    m_settings->setValue("Server/Port", m_serverPortEdit->text());
+    // ====================================================
     m_settings->setValue("Device/IP", m_deviceIpEdit->text());
     m_settings->setValue("Device/User", m_deviceUserEdit->text());
     m_settings->setValue("Device/Pwd", m_devicePwdEdit->text());

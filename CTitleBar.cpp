@@ -1,4 +1,4 @@
-#include "CTitleBar.h"
+﻿#include "CTitleBar.h"
 
 #include <QHBoxLayout>
 #include <windows.h>
@@ -58,6 +58,8 @@ void CTitleBar::initUI()
     // 连接信号
     connect(_pminButton, &QPushButton::clicked, this, &CTitleBar::onClickedSlot);
     connect(_pcloseButton, &QPushButton::clicked, this, &CTitleBar::onClickedSlot);
+    // 【新增】连接设置按钮
+    connect(_psetButton, &QPushButton::clicked, this, &CTitleBar::onClickedSlot);
 
 //    // 连接关闭信号
 //    connect(_pcloseButton, &CTitleBar::sigClose, this, &CTitleBar::closeSlot);
@@ -77,5 +79,9 @@ void CTitleBar::onClickedSlot()
     else if(pbtn == _pcloseButton) {
         emit sigClose();  // 发射信号，通知父窗口关闭
     }
+    // 【新增】处理设置按钮点击
+        else if(pbtn == _psetButton) {
+            emit sigSet(); // 发送信号给 LoginWidget
+        }
 }
 

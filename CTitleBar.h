@@ -1,4 +1,4 @@
-#ifndef CTITLEBAR_H
+﻿#ifndef CTITLEBAR_H
 #define CTITLEBAR_H
 
 #include <QWidget>
@@ -13,7 +13,7 @@ public:
 
 signals:
     void sigClose();  // 添加这个信号
-
+    void sigSet(); // 【新增】点击设置按钮的信号
 private:
     void initUI();
     //鼠标按住标题栏时，进行窗体拖拽

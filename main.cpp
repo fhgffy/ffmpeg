@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[])
 {
-    // 【修改】移除了 AA_EnableHighDpiScaling，解决比例和点击问题
+    // 移除了 AA_EnableHighDpiScaling，解决比例和点击问题
     QApplication a(argc, argv);
 
     // 保持 Fusion 样式，让登录界面好看

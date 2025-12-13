@@ -1,4 +1,4 @@
-#include "StyleHelper.h"  //样式助手类 (StyleHelper)
+﻿#include "StyleHelper.h"  //样式助手类 (StyleHelper)
 #include <QApplication>
 
 QString StyleHelper::getAppStyleSheet()
@@ -51,12 +51,10 @@ QString StyleHelper::getAppStyleSheet()
 
         QPushButton:hover {
             background-color: %4;
-            transform: translateY(-1px);
         }
 
         QPushButton:pressed {
             background-color: %5;
-            transform: translateY(1px);
         }
 
         QPushButton:disabled {

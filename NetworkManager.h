@@ -1,4 +1,4 @@
-// NetworkManager.h - 添加TCP通信相关
+﻿// NetworkManager.h - 添加TCP通信相关
 #ifndef NETWORKMANAGER_H
 #define NETWORKMANAGER_H
 
@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <functional>
 #include <string>
+#include <cstdint> // [新增] 确保使用 int32_t
 
 // 定义消息类型 - 与client.cpp保持一致
 enum MessageType {
@@ -66,7 +67,6 @@ private slots:
     void onReadyRead();
     void onError(QAbstractSocket::SocketError socketError);
     void onTimeout();
-    // 移除这行：void sendFirstMessage();  // 添加私有槽函数
 
 private:
     // TCP通信相关
@@ -76,13 +76,13 @@ private:
     // 发送TLV消息
     void sendTLVMessage(int type, const std::string &data);
     void sendTLVMessage(int type, const QString &data);
-    void sendTLVMessage(int type, const char *data);  // 添加const char*版本
+    void sendTLVMessage(int type, const char *data);
 
-    // TLV结构体定义
+    // TLV结构体定义 - [修改] 使用固定宽度整数确保跨平台安全
     #pragma pack(push, 1)
     struct TLVHeader {
-        int type;      // 消息类型
-        int length;    // 数据长度
+        int32_t type;      // 消息类型
+        int32_t length;    // 数据长度
     };
     #pragma pack(pop)
 
@@ -93,10 +93,10 @@ private:
     void handleLogin2Response(const std::string &data);
     void handleTestConnectionResponse(const std::string &data);
 
-    // 生成加密密文 - 返回std::string确保与服务端兼容
+    // 生成加密密文
     std::string generateEncryptedPassword(const QString &password, const QString &salt);
 
-    // 转换函数确保数据兼容性
+    // 转换函数
     static std::string qStringToStdString(const QString &str);
     static QString stdStringToQString(const std::string &str);
 
@@ -107,8 +107,8 @@ private:
     QString currentIp;
     int currentPort;
     QString currentUsername;
-    QString currentPassword;  // 临时存储，第一步时保存
-    QString receivedSalt;     // 服务器返回的盐值
+    QString currentPassword;
+    QString receivedSalt;
 
     std::function<void(bool, const QString&)> currentCallback;
 
@@ -116,12 +116,11 @@ private:
     bool isRegistering;
     bool isLoggingIn;
 
-    // 新增：当前操作步骤
     enum OperationStep {
         STEP_NONE,
         STEP_CONNECTING,
-        STEP_SENDING_USERNAME,  // 发送用户名阶段
-        STEP_SENDING_PASSWORD   // 发送密码阶段
+        STEP_SENDING_USERNAME,
+        STEP_SENDING_PASSWORD
     };
 
     OperationStep currentStep;

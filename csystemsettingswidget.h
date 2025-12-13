@@ -44,6 +44,10 @@ private:
     void sendApiRequest(const QMap<QString, QString>& params);
 
 private:
+    // --- 監控服務器參數 ---
+    QLineEdit *m_serverIpEdit;
+    QLineEdit *m_serverPortEdit;
+
     // 设备参数
     QLineEdit *m_deviceIpEdit;
     QLineEdit *m_deviceUserEdit;
