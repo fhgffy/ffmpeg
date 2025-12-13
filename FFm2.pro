@@ -106,3 +106,29 @@ RESOURCES += \
     sources.qrc
 
 DISTFILES +=
+
+# ==========================================
+# 整合登录界面模块 (Login Integration)
+# ==========================================
+
+# 1. 添加源文件和头文件
+HEADERS += \
+    LoginWidget.h \
+    NetworkManager.h \
+    Validator.h \
+    StyleHelper.h \
+    CTitleBar.h
+
+SOURCES += \
+    LoginWidget.cpp \
+    NetworkManager.cpp \
+    Validator.cpp \
+    StyleHelper.cpp \
+    CTitleBar.cpp
+
+# 2. 添加登录界面的资源文件 (这一步能让图标显示出来)
+RESOURCES += \
+    TitleBarImages.qrc
+
+# 3. 解决Windows下可能的编码或链接问题 (可选，建议加上)
+win32: LIBS += -luser32 -ldwmapi
